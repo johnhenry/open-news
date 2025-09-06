@@ -25,6 +25,11 @@ export const Source = {
     const fields = Object.keys(updates).map(key => `${key} = @${key}`).join(', ');
     const stmt = db.prepare(`UPDATE sources SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = @id`);
     return stmt.run({ ...updates, id });
+  },
+  
+  delete(id) {
+    const stmt = db.prepare('DELETE FROM sources WHERE id = ?');
+    return stmt.run(id);
   }
 };
 

@@ -154,6 +154,25 @@ class LLMManager {
     return results;
   }
 
+  async testAdapter(adapterName) {
+    try {
+      const adapter = this.createAdapter(adapterName);
+      if (!adapter) {
+        throw new Error(`Adapter ${adapterName} not found`);
+      }
+      
+      const initialized = await adapter.initialize();
+      if (!initialized) {
+        throw new Error(`Failed to initialize ${adapterName}`);
+      }
+      
+      const result = await adapter.testConnection();
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
   getStatus() {
     return {
       current: this.currentAdapter?.name || null,

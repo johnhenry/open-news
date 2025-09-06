@@ -171,3 +171,19 @@ body {
   color: var(--color-text-light);
   margin-top: 4px;
 }
+
+/* Page descriptions */
+.page-description {
+  color: #6b7280;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: -10px 0 25px 0;
+}
+
+/* Section hints */
+.section-hint {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: -5px 0 15px 0;
+}

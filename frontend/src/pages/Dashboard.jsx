@@ -50,6 +50,10 @@ function Dashboard() {
   return (
     <div className="dashboard">
       <h1>News Aggregator Dashboard</h1>
+      <p className="page-description">
+        Monitor news coverage across the political spectrum. Track how different sources 
+        cover the same stories to identify bias patterns and get a complete picture.
+      </p>
       
       <div className="stats-grid">
         <div className="stat-card">
@@ -72,6 +76,9 @@ function Dashboard() {
 
       <div className="card">
         <h2>Article Distribution by Bias</h2>
+        <p className="section-hint">
+          This chart shows the political leaning of your news sources. A balanced diet includes perspectives from across the spectrum.
+        </p>
         <ResponsiveContainer width="100%" height={300}>
           <PieChart>
             <Pie
@@ -95,6 +102,9 @@ function Dashboard() {
 
       <div className="card">
         <h2>Recent News Clusters</h2>
+        <p className="section-hint">
+          News clusters group similar stories from different sources, revealing how the same event is covered differently.
+        </p>
         <div className="clusters-list">
           {recentClusters.map(cluster => (
             <div key={cluster.id} className="cluster-item" style={{ marginBottom: '20px', padding: '15px', background: '#f9fafb', borderRadius: '6px' }}>

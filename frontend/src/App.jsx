@@ -5,6 +5,7 @@ import Clusters from './pages/Clusters';
 import ClusterDetail from './pages/ClusterDetail';
 import Articles from './pages/Articles';
 import Sources from './pages/Sources';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -29,6 +30,9 @@ function App() {
                 <NavLink to="/sources" className={({ isActive }) => isActive ? 'active' : ''}>
                   Sources
                 </NavLink>
+                <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}>
+                  ⚙️ Settings
+                </NavLink>
               </nav>
             </div>
           </div>
@@ -42,6 +46,7 @@ function App() {
               <Route path="/clusters/:id" element={<ClusterDetail />} />
               <Route path="/articles" element={<Articles />} />
               <Route path="/sources" element={<Sources />} />
+              <Route path="/settings" element={<Settings />} />
             </Routes>
           </div>
         </main>

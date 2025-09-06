@@ -30,8 +30,15 @@ function Clusters() {
     <div className="clusters-page">
       <h1>News Clusters</h1>
       <p style={{ color: '#6b7280', marginBottom: '30px' }}>
-        Stories grouped by topic, showing coverage across the political spectrum
+        Stories grouped by topic, showing coverage across the political spectrum. 
+        Click any cluster to see how different sources frame the same story.
       </p>
+      
+      <div className="info-box" style={{ marginBottom: '30px', padding: '15px', background: '#eff6ff', borderRadius: '8px' }}>
+        💡 <strong>Understanding Clusters:</strong> Each cluster represents the same news story covered by multiple sources. 
+        The colored badges show how many articles from each political perspective (left, center, right) are covering this story. 
+        This helps you see which stories are getting attention from which parts of the media spectrum.
+      </div>
 
       <div className="clusters-grid">
         {clusters.map(cluster => (

@@ -5,6 +5,7 @@ import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { registerRoutes } from './api/routes.js';
+import { registerSettingsRoutes } from './api/settings-routes.js';
 import migrate from './db/migrate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -40,6 +41,7 @@ if (fs.existsSync(frontendBuildPath)) {
 }
 
 await registerRoutes(fastify);
+await registerSettingsRoutes(fastify);
 
 async function start() {
   try {
