@@ -473,45 +473,6 @@ function Settings() {
                 </div>
               ))}
             </div>
-
-            <div className="settings-group">
-              {settings.ingestion?.map(setting => (
-                <div key={setting.key} className="setting-item">
-                  <label>
-                    <span className="setting-label">{setting.description}</span>
-                    {setting.type === 'boolean' ? (
-                      <input 
-                        type="checkbox" 
-                        checked={setting.value}
-                        onChange={(e) => updateSetting('ingestion', setting.key, e.target.checked)}
-                      />
-                    ) : setting.type === 'number' ? (
-                      <input 
-                        type="number" 
-                        value={setting.value}
-                        step={setting.key.includes('threshold') ? '0.1' : '1'}
-                        onChange={(e) => updateSetting('ingestion', setting.key, parseFloat(e.target.value))}
-                      />
-                    ) : (
-                      <input 
-                        type="text" 
-                        value={setting.value}
-                        onChange={(e) => updateSetting('ingestion', setting.key, e.target.value)}
-                      />
-                    )}
-                  </label>
-                </div>
-              ))}
-            </div>
-
-            <div className="settings-actions">
-              <button onClick={() => saveSettings('ingestion')} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Ingestion Settings'}
-              </button>
-              <button onClick={() => resetSettings('ingestion')} className="secondary">
-                Reset to Defaults
-              </button>
-            </div>
           </div>
         )}
 
