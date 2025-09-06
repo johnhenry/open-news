@@ -1,0 +1,47 @@
+{
+  "name": "open-news",
+  "version": "1.0.0",
+  "description": "Open-source Ground News-style news aggregator for comparing coverage across political spectrum",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "migrate": "node src/db/migrate.js",
+    "ingest": "node src/jobs/ingest.js",
+    "cluster": "node src/jobs/cluster.js",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "jest",
+    "docker:build": "docker build -t open-news .",
+    "docker:run": "docker run -p 3000:3000 -p 3001:3001 open-news"
+  },
+  "keywords": [
+    "news",
+    "aggregator",
+    "bias",
+    "media",
+    "journalism"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@fastify/cors": "^8.5.0",
+    "@fastify/static": "^6.12.0",
+    "@xenova/transformers": "^2.17.0",
+    "better-sqlite3": "^11.5.0",
+    "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.25.2",
+    "ml-distance": "^4.0.1",
+    "ml-kmeans": "^6.0.0",
+    "natural": "^6.10.0",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2",
+    "rss-parser": "^3.13.0",
+    "socket.io": "^4.6.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2"
+  }
+}

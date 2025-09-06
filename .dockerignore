@@ -1,0 +1,9 @@
+node_modules
+frontend/node_modules
+frontend/build
+data/*.db
+.git
+.env.local
+.DS_Store
+*.log
+npm-debug.log*
