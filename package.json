@@ -10,6 +10,8 @@
     "migrate": "node src/db/migrate.js",
     "ingest": "node src/jobs/ingest.js",
     "cluster": "node src/jobs/cluster.js",
+    "llm": "node src/llm/cli.js",
+    "seed": "node src/utils/seed-sources.js",
     "build:frontend": "cd frontend && npm run build",
     "test": "jest",
     "docker:build": "docker build -t open-news .",

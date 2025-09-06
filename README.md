@@ -192,8 +192,9 @@ export const scrape = async (url) => {
 - [x] MVP - RSS ingestion with side-by-side comparison
 - [x] Keyword-based clustering
 - [x] Source-level bias classification
-- [ ] Advanced NLP bias detection
-- [ ] LLM-powered fact extraction
+- [ ] Advanced NLP bias detection (in progress)
+- [ ] LLM-powered fact extraction (in progress)
+- [ ] MCP (Model Context Protocol) server for AI assistants
 - [ ] User accounts and personalization
 - [ ] Mobile app
 - [ ] Browser extension
