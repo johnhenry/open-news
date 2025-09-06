@@ -4,11 +4,12 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import './Settings.css';
 
 function Settings() {
-  const [activeTab, setActiveTab] = useState('llm');
+  const [activeTab, setActiveTab] = useState('sources');
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [saveTimeout, setSaveTimeout] = useState(null);
   
   // LLM specific state
   const [adapters, setAdapters] = useState([]);
@@ -33,6 +34,15 @@ function Settings() {
     loadSettings();
     loadAdditionalData();
   }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeout) {
+        clearTimeout(saveTimeout);
+      }
+    };
+  }, [saveTimeout]);
 
   async function loadSettings() {
     try {
@@ -68,39 +78,61 @@ function Settings() {
     }
   }
 
-  async function saveSettings(category = null) {
-    try {
-      setSaving(true);
-      
-      const updates = {};
-      const categorySettings = category ? settings[category] : Object.values(settings).flat();
-      
-      categorySettings.forEach(setting => {
-        updates[setting.key] = setting.value;
-      });
-      
-      await newsAPI.updateSettings(updates);
-      showMessage('Settings saved successfully', 'success');
-      
-      // Reload settings to get any server-side changes
-      await loadSettings();
-    } catch (err) {
-      showMessage('Failed to save settings', 'error');
-    } finally {
-      setSaving(false);
+  // Auto-save settings with debouncing
+  async function autoSaveSettings(key, value) {
+    // Clear existing timeout
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
     }
+
+    // Show saving indicator
+    setSaving(true);
+    
+    // Set new timeout for debounced save
+    const timeout = setTimeout(async () => {
+      try {
+        await newsAPI.updateSettings({ [key]: value });
+        showMessage('Settings updated', 'success', 2000);
+        
+        // Reload settings to get any server-side changes
+        await loadSettings();
+        
+        // Reload jobs if schedule was changed
+        if (key.includes('schedule') || key.includes('cron')) {
+          const jobsData = await newsAPI.getScheduledJobs();
+          setJobs(jobsData);
+        }
+      } catch (err) {
+        showMessage('Failed to save settings', 'error');
+      } finally {
+        setSaving(false);
+      }
+    }, 500); // 500ms debounce
+    
+    setSaveTimeout(timeout);
   }
 
   async function resetSettings(category = null) {
-    if (!confirm(`Reset ${category || 'all'} settings to defaults?`)) return;
-    
-    try {
-      await newsAPI.resetSettings({ category });
-      await loadSettings();
-      showMessage('Settings reset to defaults', 'success');
-    } catch (err) {
-      showMessage('Failed to reset settings', 'error');
-    }
+    setConfirmAction({
+      title: 'Reset Settings',
+      message: `Are you sure you want to reset ${category || 'all'} settings to defaults?`,
+      onConfirm: async () => {
+        try {
+          await newsAPI.resetSettings({ category });
+          await loadSettings();
+          showMessage('Settings reset to defaults', 'success');
+        } catch (err) {
+          showMessage('Failed to reset settings', 'error');
+        }
+        setConfirmAction(null);
+      },
+      onCancel: () => setConfirmAction(null)
+    });
+  }
+
+  function showMessage(text, type = 'info', duration = 3000) {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), duration);
   }
 
   async function testAdapter(adapterName) {
@@ -109,9 +141,9 @@ function Settings() {
       const result = await newsAPI.testLLMAdapter(adapterName);
       
       if (result.success) {
-        showMessage(`${adapterName} is working correctly`, 'success');
+        showMessage(`${adapterName} is working correctly!`, 'success');
       } else {
-        showMessage(`${adapterName} test failed: ${result.message}`, 'error');
+        showMessage(`${adapterName} test failed: ${result.error}`, 'error');
       }
     } catch (err) {
       showMessage(`Failed to test ${adapterName}`, 'error');
@@ -120,82 +152,154 @@ function Settings() {
     }
   }
 
-  async function saveSource(source) {
+  // Source management functions
+  async function saveSource(sourceData) {
     try {
-      if (source.id) {
-        await newsAPI.updateSource(source.id, source);
+      if (sourceData.id) {
+        await newsAPI.updateSource(sourceData.id, sourceData);
+        showMessage('Source updated successfully', 'success');
       } else {
-        await newsAPI.createSource(source);
+        await newsAPI.createSource(sourceData);
+        showMessage('Source created successfully', 'success');
       }
       
-      await loadAdditionalData();
+      const sourcesData = await newsAPI.getSettingsSources();
+      setSources(sourcesData.sources);
       setEditingSource(null);
       setShowAddSource(false);
-      showMessage('Source saved successfully', 'success');
     } catch (err) {
       showMessage('Failed to save source', 'error');
     }
   }
 
-  async function deleteSource(id) {
-    if (!confirm('Delete this source?')) return;
-    
-    try {
-      await newsAPI.deleteSource(id);
-      await loadAdditionalData();
-      showMessage('Source deleted', 'success');
-    } catch (err) {
-      showMessage('Failed to delete source', 'error');
-    }
+  async function deleteSource(sourceId) {
+    setConfirmAction({
+      title: 'Delete Source',
+      message: 'Are you sure you want to delete this source? All articles from this source will also be deleted.',
+      onConfirm: async () => {
+        try {
+          await newsAPI.deleteSource(sourceId);
+          const sourcesData = await newsAPI.getSettingsSources();
+          setSources(sourcesData.sources);
+          showMessage('Source deleted successfully', 'success');
+        } catch (err) {
+          showMessage('Failed to delete source', 'error');
+        }
+        setConfirmAction(null);
+      },
+      onCancel: () => setConfirmAction(null)
+    });
   }
 
-  async function toggleSource(id) {
+  async function toggleSource(sourceId) {
     try {
-      await newsAPI.toggleSource(id);
-      await loadAdditionalData();
+      const source = sources.find(s => s.id === sourceId);
+      await newsAPI.updateSource(sourceId, { active: !source.active });
+      const sourcesData = await newsAPI.getSettingsSources();
+      setSources(sourcesData.sources);
+      showMessage(`Source ${source.active ? 'disabled' : 'enabled'}`, 'success');
     } catch (err) {
       showMessage('Failed to toggle source', 'error');
     }
   }
 
-  async function updateJob(jobName, updates) {
+  // Job management functions
+  async function toggleJob(jobName) {
+    const job = jobs.find(j => j.job_name === jobName);
     try {
-      await newsAPI.updateScheduledJob(jobName, updates);
-      await loadAdditionalData();
-      showMessage('Job updated', 'success');
+      await newsAPI.updateJob(jobName, { enabled: !job.enabled });
+      const jobsData = await newsAPI.getScheduledJobs();
+      setJobs(jobsData);
+      showMessage(`${jobName} ${job.enabled ? 'disabled' : 'enabled'}`, 'success');
     } catch (err) {
-      showMessage('Failed to update job', 'error');
+      showMessage(`Failed to toggle ${jobName}`, 'error');
     }
+  }
+
+  async function updateJobSchedule(jobName, cronExpression) {
+    try {
+      await newsAPI.updateJob(jobName, { cron_expression: cronExpression });
+      const jobsData = await newsAPI.getScheduledJobs();
+      setJobs(jobsData);
+      showMessage(`${jobName} schedule updated`, 'success');
+    } catch (err) {
+      showMessage(`Failed to update ${jobName} schedule`, 'error');
+    }
+  }
+
+  async function triggerJob(jobName) {
+    try {
+      if (jobName === 'ingestion') {
+        await newsAPI.triggerIngestion();
+        showMessage('Ingestion started', 'success');
+      } else if (jobName === 'clustering') {
+        await newsAPI.triggerClustering();
+        showMessage('Clustering started', 'success');
+      }
+    } catch (err) {
+      showMessage(`Failed to trigger ${jobName}`, 'error');
+    }
+  }
+
+  // Data management functions
+  async function cleanupData() {
+    const days = parseInt(cleanupDays);
+    setConfirmAction({
+      title: days === 0 ? 'Delete ALL Articles' : 'Clean Old Articles',
+      message: days === 0 
+        ? 'Are you sure you want to delete ALL articles? This cannot be undone.'
+        : `Are you sure you want to delete articles older than ${days} days?`,
+      onConfirm: async () => {
+        try {
+          await newsAPI.cleanupOldArticles(days);
+          const stats = await newsAPI.getDataStats();
+          setDataStats(stats);
+          showMessage(days === 0 ? 'All articles deleted' : `Old articles cleaned (${days} days)`, 'success');
+        } catch (err) {
+          showMessage('Failed to cleanup articles', 'error');
+        }
+        setConfirmAction(null);
+      },
+      onCancel: () => setConfirmAction(null)
+    });
+  }
+
+  async function clearClusters() {
+    setConfirmAction({
+      title: 'Clear All Clusters',
+      message: 'Are you sure you want to delete all article clusters?',
+      onConfirm: async () => {
+        try {
+          await newsAPI.clearClusters();
+          const stats = await newsAPI.getDataStats();
+          setDataStats(stats);
+          showMessage('All clusters cleared', 'success');
+        } catch (err) {
+          showMessage('Failed to clear clusters', 'error');
+        }
+        setConfirmAction(null);
+      },
+      onCancel: () => setConfirmAction(null)
+    });
   }
 
   async function clearCache() {
     setConfirmAction({
-      message: 'Clear all LLM cache?',
+      title: 'Clear LLM Cache',
+      message: 'Are you sure you want to clear the LLM response cache?',
       onConfirm: async () => {
         try {
-          await newsAPI.clearCache('llm');
-          await loadAdditionalData();
-          showMessage('Cache cleared', 'success');
+          await newsAPI.clearCache();
+          const stats = await newsAPI.getDataStats();
+          setDataStats(stats);
+          showMessage('Cache cleared successfully', 'success');
         } catch (err) {
           showMessage('Failed to clear cache', 'error');
         }
         setConfirmAction(null);
-      }
+      },
+      onCancel: () => setConfirmAction(null)
     });
-  }
-
-  async function cleanupData() {
-    try {
-      const days = parseInt(cleanupDays);
-      const result = await newsAPI.cleanupData(days);
-      await loadAdditionalData();
-      const message = days === 0 
-        ? `Deleted ${result.deleted} articles (cleared all)`
-        : `Deleted ${result.deleted} articles older than ${days} days`;
-      showMessage(message, 'success');
-    } catch (err) {
-      showMessage('Failed to cleanup data', 'error');
-    }
   }
 
   async function exportData(type) {
@@ -205,47 +309,27 @@ function Settings() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `open-news-export-${type}-${Date.now()}.json`;
+      a.download = `opennews-${type}-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showMessage('Data exported', 'success');
+      showMessage(`Exported ${type} data`, 'success');
     } catch (err) {
-      showMessage('Failed to export data', 'error');
+      showMessage(`Failed to export ${type}`, 'error');
     }
   }
 
   async function triggerClustering() {
     try {
-      showMessage('Running clustering...', 'info');
-      const result = await newsAPI.triggerClustering();
-      await loadAdditionalData();
-      showMessage(`Clustering complete: ${result.clusters_created} clusters created from ${result.articles_processed} articles`, 'success');
+      await newsAPI.triggerClustering();
+      showMessage('Clustering started', 'success');
     } catch (err) {
-      showMessage('Failed to run clustering', 'error');
+      showMessage('Failed to trigger clustering', 'error');
     }
   }
 
-  async function clearClusters() {
-    setConfirmAction({
-      message: 'Clear all clusters? This will remove all article groupings.',
-      onConfirm: async () => {
-        try {
-          const result = await newsAPI.clearClusters();
-          await loadAdditionalData();
-          showMessage(`Cleared ${result.deleted} clusters`, 'success');
-        } catch (err) {
-          showMessage('Failed to clear clusters', 'error');
-        }
-        setConfirmAction(null);
-      }
-    });
-  }
-
-  function showMessage(text, type) {
-    setMessage({ text, type });
-    setTimeout(() => setMessage(null), 5000);
-  }
-
+  // Update a setting value and auto-save
   function updateSetting(category, key, value) {
     setSettings(prev => ({
       ...prev,
@@ -253,6 +337,9 @@ function Settings() {
         s.key === key ? { ...s, value } : s
       )
     }));
+    
+    // Auto-save the change
+    autoSaveSettings(key, value);
   }
 
   if (loading) return <div className="loading">Loading settings...</div>;
@@ -267,13 +354,16 @@ function Settings() {
         </div>
       )}
 
+      {confirmAction && (
+        <ConfirmDialog
+          title={confirmAction.title}
+          message={confirmAction.message}
+          onConfirm={confirmAction.onConfirm}
+          onCancel={confirmAction.onCancel}
+        />
+      )}
+
       <div className="settings-tabs">
-        <button 
-          className={activeTab === 'llm' ? 'active' : ''} 
-          onClick={() => setActiveTab('llm')}
-        >
-          🤖 LLM Configuration
-        </button>
         <button 
           className={activeTab === 'sources' ? 'active' : ''} 
           onClick={() => setActiveTab('sources')}
@@ -281,22 +371,28 @@ function Settings() {
           📰 Sources
         </button>
         <button 
-          className={activeTab === 'ingestion' ? 'active' : ''} 
-          onClick={() => setActiveTab('ingestion')}
+          className={activeTab === 'collection' ? 'active' : ''} 
+          onClick={() => setActiveTab('collection')}
         >
-          ⚙️ Ingestion
+          📥 Collection
         </button>
         <button 
-          className={activeTab === 'data' ? 'active' : ''} 
-          onClick={() => setActiveTab('data')}
+          className={activeTab === 'processing' ? 'active' : ''} 
+          onClick={() => setActiveTab('processing')}
         >
-          🗄️ Data Management
+          🔗 Processing
         </button>
         <button 
-          className={activeTab === 'content' ? 'active' : ''} 
-          onClick={() => setActiveTab('content')}
+          className={activeTab === 'ai' ? 'active' : ''} 
+          onClick={() => setActiveTab('ai')}
         >
-          🔬 Content & Research
+          🤖 AI/LLM
+        </button>
+        <button 
+          className={activeTab === 'database' ? 'active' : ''} 
+          onClick={() => setActiveTab('database')}
+        >
+          💾 Database
         </button>
         <button 
           className={activeTab === 'display' ? 'active' : ''} 
@@ -304,138 +400,32 @@ function Settings() {
         >
           🎨 Display
         </button>
+        <button 
+          className={activeTab === 'privacy' ? 'active' : ''} 
+          onClick={() => setActiveTab('privacy')}
+        >
+          🔒 Privacy
+        </button>
       </div>
 
       <div className="settings-content">
-        {activeTab === 'llm' && (
-          <div className="settings-section">
-            <h2>AI/LLM Configuration</h2>
-            <p className="section-description">
-              Configure AI-powered features for bias detection and fact extraction. 
-              The system can use various AI providers to analyze articles automatically.
-            </p>
-            
-            <div className="info-box">
-              💡 <strong>Quick Setup:</strong> For local AI, install Ollama (brew install ollama) and run 'ollama serve'. 
-              For cloud AI, add API keys to your .env file.
-            </div>
-            
-            <div className="info-box" style={{marginTop: '1rem'}}>
-              📊 <strong>Analysis Methods:</strong>
-              <ul style={{marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem'}}>
-                <li><strong>Source Default:</strong> Use the source's configured bias (fastest, no processing)</li>
-                <li><strong>Keyword-Based:</strong> Local sentiment and keyword analysis (moderate speed, privacy-focused)</li>
-                <li><strong>LLM-Powered:</strong> AI-based bias detection (slowest, most accurate)</li>
-              </ul>
-            </div>
-            
-            <div className="adapters-grid">
-              {adapters.map(adapter => (
-                <div key={adapter.name} className={`adapter-card ${adapter.active ? 'active' : ''}`}>
-                  <h3>{adapter.name.toUpperCase()}</h3>
-                  <div className="adapter-status">
-                    <span className={`status-dot ${adapter.available ? 'available' : 'unavailable'}`} />
-                    {adapter.available ? 'Available' : 'Not Available'}
-                  </div>
-                  {!adapter.configured && adapter.name !== 'ollama' && adapter.name !== 'lmstudio' && (
-                    <p className="warning">⚠️ API key required - Configure in .env file</p>
-                  )}
-                  {adapter.name === 'ollama' && !adapter.available && (
-                    <p className="warning">⚠️ Ollama not running - Start with: ollama serve</p>
-                  )}
-                  {adapter.name === 'lmstudio' && !adapter.available && (
-                    <p className="warning">⚠️ LM Studio not detected - Check if server is running on port 1234</p>
-                  )}
-                  {adapter.name === 'openai' && adapter.configured && !adapter.available && (
-                    <p className="warning">⚠️ OpenAI API key configured but connection failed - Check your API key and internet connection</p>
-                  )}
-                  {adapter.name === 'gemini' && adapter.configured && !adapter.available && (
-                    <p className="warning">⚠️ Gemini API key configured but connection failed - Check your API key and internet connection</p>
-                  )}
-                  <div className="adapter-actions">
-                    <button 
-                      onClick={() => testAdapter(adapter.name)}
-                      disabled={!adapter.available || testingAdapter === adapter.name}
-                    >
-                      {testingAdapter === adapter.name ? 'Testing...' : 'Test'}
-                    </button>
-                    {!adapter.active && adapter.available && (
-                      <button onClick={async () => {
-                        try {
-                          await newsAPI.updateSettings({ llm_adapter: adapter.name });
-                          await loadSettings();
-                          await loadAdditionalData();
-                          showMessage(`${adapter.name} is now the active adapter`, 'success');
-                        } catch (err) {
-                          showMessage(`Failed to set ${adapter.name} as active`, 'error');
-                        }
-                      }}>
-                        Set Active
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="settings-group">
-              {settings.llm?.map(setting => (
-                <div key={setting.key} className="setting-item">
-                  <label>
-                    <span className="setting-label">{setting.description}</span>
-                    {setting.key === 'analysis_method' ? (
-                      <select 
-                        value={setting.value}
-                        onChange={(e) => updateSetting('llm', setting.key, e.target.value)}
-                      >
-                        <option value="source_default">Source Default (No Analysis)</option>
-                        <option value="keyword">Keyword-Based (Local)</option>
-                        <option value="llm">LLM-Powered (AI)</option>
-                      </select>
-                    ) : setting.type === 'boolean' ? (
-                      <input 
-                        type="checkbox" 
-                        checked={setting.value}
-                        onChange={(e) => updateSetting('llm', setting.key, e.target.checked)}
-                      />
-                    ) : setting.type === 'number' ? (
-                      <input 
-                        type="number" 
-                        value={setting.value}
-                        step="0.1"
-                        onChange={(e) => updateSetting('llm', setting.key, parseFloat(e.target.value))}
-                      />
-                    ) : (
-                      <input 
-                        type="text" 
-                        value={setting.value}
-                        onChange={(e) => updateSetting('llm', setting.key, e.target.value)}
-                      />
-                    )}
-                  </label>
-                </div>
-              ))}
-            </div>
-
-            <div className="settings-actions">
-              <button onClick={() => saveSettings('llm')} disabled={saving}>
-                {saving ? 'Saving...' : 'Save LLM Settings'}
-              </button>
-              <button onClick={() => resetSettings('llm')} className="secondary">
-                Reset to Defaults
-              </button>
-            </div>
+        {saving && (
+          <div className="saving-indicator">
+            💾 Saving changes...
           </div>
         )}
 
         {activeTab === 'sources' && (
           <div className="settings-section">
             <div className="section-header">
-              <h2>News Source Management</h2>
+              <h2>News Sources</h2>
               <button onClick={() => setShowAddSource(true)} className="add-button">
                 + Add Source
               </button>
             </div>
+            <p className="section-description">
+              Manage RSS feeds and news sources. Add new sources, edit existing ones, or toggle them on/off.
+            </p>
 
             {(showAddSource || editingSource) && (
               <SourceForm 
@@ -476,61 +466,118 @@ function Settings() {
           </div>
         )}
 
-        {activeTab === 'ingestion' && (
+        {activeTab === 'collection' && (
           <div className="settings-section">
-            <h2>Automatic Ingestion & Clustering</h2>
+            <h2>Article Collection</h2>
             <p className="section-description">
-              Control how often the system fetches new articles and groups similar stories together. 
-              Use cron expressions (e.g., '*/15 * * * *' = every 15 minutes).
+              Configure how and when the system fetches new articles from your sources.
             </p>
             
             <div className="info-box">
-              📅 <strong>Cron Expression Guide:</strong> Use standard cron format - "*/15 * * * *" = every 15 minutes, 
-              "0 */2 * * *" = every 2 hours, "0 9 * * *" = daily at 9am. 
-              Format: [minute] [hour] [day] [month] [day-of-week]
+              📅 <strong>Cron Expression Guide:</strong> Use standard cron format
+              <ul style={{marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem'}}>
+                <li>"*/15 * * * *" = every 15 minutes</li>
+                <li>"0 */2 * * *" = every 2 hours</li>
+                <li>"0 9 * * *" = daily at 9am</li>
+              </ul>
             </div>
             
-            <div className="jobs-grid">
-              {jobs.map(job => (
-                <div key={job.job_name} className="job-card">
-                  <h3>{job.job_name.charAt(0).toUpperCase() + job.job_name.slice(1)}</h3>
-                  <div className="job-status">
-                    <span className={`status-dot ${job.enabled ? 'enabled' : 'disabled'}`} />
-                    {job.enabled ? 'Enabled' : 'Disabled'}
-                  </div>
-                  {job.last_run && (
-                    <p>Last run: {new Date(job.last_run).toLocaleString()}</p>
-                  )}
-                  {job.next_run && job.enabled && (
-                    <p>Next run: {new Date(job.next_run).toLocaleString()}</p>
-                  )}
-                  <div className="job-controls">
-                    <input 
-                      type="text" 
-                      value={job.cron_expression || ''}
-                      placeholder="Cron expression"
-                      onChange={(e) => {
-                        const updated = jobs.map(j => 
-                          j.job_name === job.job_name 
-                            ? { ...j, cron_expression: e.target.value }
-                            : j
-                        );
-                        setJobs(updated);
-                      }}
-                    />
-                    <button onClick={() => updateJob(job.job_name, {
-                      enabled: !job.enabled,
-                      cron_expression: job.cron_expression
-                    })}>
+            <div className="job-section">
+              <h3>Ingestion Schedule</h3>
+              {jobs.filter(j => j.job_name === 'ingestion').map(job => (
+                <div key={job.job_name} className="job-config">
+                  <div className="job-header">
+                    <div className="job-status">
+                      <span className={`status-dot ${job.enabled ? 'enabled' : 'disabled'}`} />
+                      {job.enabled ? 'Enabled' : 'Disabled'}
+                    </div>
+                    <button 
+                      onClick={() => toggleJob(job.job_name)}
+                      className={job.enabled ? 'disable-button' : 'enable-button'}
+                    >
                       {job.enabled ? 'Disable' : 'Enable'}
                     </button>
                   </div>
+                  
+                  <div className="job-schedule">
+                    <label>
+                      Schedule (cron expression):
+                      <input 
+                        type="text" 
+                        value={job.cron_expression}
+                        onChange={(e) => updateJobSchedule(job.job_name, e.target.value)}
+                        onBlur={() => updateJobSchedule(job.job_name, job.cron_expression)}
+                      />
+                    </label>
+                  </div>
+                  
+                  {job.last_run && (
+                    <div className="job-info">
+                      <small>Last run: {new Date(job.last_run).toLocaleString()}</small>
+                    </div>
+                  )}
+                  
+                  <button onClick={() => triggerJob(job.job_name)} className="trigger-button">
+                    ▶️ Run Now
+                  </button>
                 </div>
               ))}
             </div>
-            
-            <div className="settings-group" style={{marginTop: '2rem'}}>
+          </div>
+        )}
+
+        {activeTab === 'processing' && (
+          <div className="settings-section">
+            <h2>Article Processing</h2>
+            <p className="section-description">
+              Configure how articles are analyzed, clustered, and processed after collection.
+            </p>
+
+            <div className="job-section">
+              <h3>Clustering Schedule</h3>
+              {jobs.filter(j => j.job_name === 'clustering').map(job => (
+                <div key={job.job_name} className="job-config">
+                  <div className="job-header">
+                    <div className="job-status">
+                      <span className={`status-dot ${job.enabled ? 'enabled' : 'disabled'}`} />
+                      {job.enabled ? 'Enabled' : 'Disabled'}
+                    </div>
+                    <button 
+                      onClick={() => toggleJob(job.job_name)}
+                      className={job.enabled ? 'disable-button' : 'enable-button'}
+                    >
+                      {job.enabled ? 'Disable' : 'Enable'}
+                    </button>
+                  </div>
+                  
+                  <div className="job-schedule">
+                    <label>
+                      Schedule (cron expression):
+                      <input 
+                        type="text" 
+                        value={job.cron_expression}
+                        onChange={(e) => updateJobSchedule(job.job_name, e.target.value)}
+                        onBlur={() => updateJobSchedule(job.job_name, job.cron_expression)}
+                      />
+                    </label>
+                  </div>
+                  
+                  {job.last_run && (
+                    <div className="job-info">
+                      <small>Last run: {new Date(job.last_run).toLocaleString()}</small>
+                    </div>
+                  )}
+                  
+                  <button onClick={() => triggerJob(job.job_name)} className="trigger-button">
+                    ▶️ Run Now
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="settings-group">
               <h3>Clustering Parameters</h3>
+              
               <div className="setting-item">
                 <label>
                   <span className="setting-label">Similarity Threshold</span>
@@ -541,7 +588,7 @@ function Settings() {
                       max="0.9"
                       step="0.1"
                       value={settings.ingestion?.find(s => s.key === 'similarity_threshold')?.value || 0.7}
-                      onChange={(e) => updateSetting('ingestion', 'similarity_threshold', e.target.value)}
+                      onChange={(e) => updateSetting('ingestion', 'similarity_threshold', parseFloat(e.target.value))}
                       style={{flex: 1}}
                     />
                     <span style={{minWidth: '3rem', textAlign: 'right'}}>
@@ -562,7 +609,7 @@ function Settings() {
                     min="2"
                     max="10"
                     value={settings.ingestion?.find(s => s.key === 'min_cluster_size')?.value || 2}
-                    onChange={(e) => updateSetting('ingestion', 'min_cluster_size', e.target.value)}
+                    onChange={(e) => updateSetting('ingestion', 'min_cluster_size', parseInt(e.target.value))}
                     style={{width: '100px'}}
                   />
                   <small style={{color: '#666', display: 'block', marginTop: '0.5rem'}}>
@@ -571,15 +618,138 @@ function Settings() {
                 </label>
               </div>
             </div>
+
+            <div className="settings-group">
+              <h3>Analysis Method</h3>
+              <div className="info-box">
+                📊 <strong>Analysis Methods:</strong>
+                <ul style={{marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem'}}>
+                  <li><strong>Source Default:</strong> Use the source's configured bias (fastest, no processing)</li>
+                  <li><strong>Keyword-Based:</strong> Local sentiment and keyword analysis (moderate speed, privacy-focused)</li>
+                  <li><strong>LLM-Powered:</strong> AI-based bias detection (slowest, most accurate)</li>
+                </ul>
+              </div>
+              
+              <div className="setting-item">
+                <label>
+                  <span className="setting-label">Article Analysis Method</span>
+                  <select 
+                    value={settings.llm?.find(s => s.key === 'analysis_method')?.value || 'source_default'}
+                    onChange={(e) => updateSetting('llm', 'analysis_method', e.target.value)}
+                  >
+                    <option value="source_default">Source Default (No Analysis)</option>
+                    <option value="keyword">Keyword-Based (Local)</option>
+                    <option value="llm">LLM-Powered (AI)</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div className="action-buttons" style={{marginTop: '2rem'}}>
+              <button onClick={clearClusters}>🗑️ Clear All Clusters</button>
+            </div>
           </div>
         )}
 
-        {activeTab === 'data' && (
+        {activeTab === 'ai' && (
           <div className="settings-section">
-            <h2>Storage & Data Management</h2>
+            <h2>AI/LLM Configuration</h2>
             <p className="section-description">
-              Manage your database storage, clean up old articles, and export your data. 
-              Keep your database lean and performant.
+              Configure AI providers for advanced article analysis and fact extraction.
+            </p>
+            
+            <div className="info-box">
+              💡 <strong>Quick Setup:</strong> For local AI, install Ollama (brew install ollama) and run 'ollama serve'. 
+              For cloud AI, add API keys to your .env file.
+            </div>
+            
+            <div className="adapters-grid">
+              {adapters.map(adapter => (
+                <div key={adapter.name} className={`adapter-card ${adapter.active ? 'active' : ''}`}>
+                  <h3>{adapter.name.toUpperCase()}</h3>
+                  <div className="adapter-status">
+                    <span className={`status-dot ${adapter.available ? 'available' : 'unavailable'}`} />
+                    {adapter.available ? 'Available' : 'Not Available'}
+                  </div>
+                  {!adapter.configured && adapter.name !== 'ollama' && adapter.name !== 'lmstudio' && (
+                    <p className="warning">⚠️ API key required - Configure in .env file</p>
+                  )}
+                  {adapter.name === 'ollama' && !adapter.available && (
+                    <p className="warning">⚠️ Ollama not running - Start with: ollama serve</p>
+                  )}
+                  {adapter.name === 'lmstudio' && !adapter.available && (
+                    <p className="warning">⚠️ LM Studio not detected - Check if server is running on port 1234</p>
+                  )}
+                  {adapter.name === 'openai' && adapter.configured && !adapter.available && (
+                    <p className="warning">⚠️ OpenAI API key configured but connection failed</p>
+                  )}
+                  {adapter.name === 'gemini' && adapter.configured && !adapter.available && (
+                    <p className="warning">⚠️ Gemini API key configured but connection failed</p>
+                  )}
+                  <div className="adapter-actions">
+                    <button 
+                      onClick={() => testAdapter(adapter.name)}
+                      disabled={!adapter.available || testingAdapter === adapter.name}
+                    >
+                      {testingAdapter === adapter.name ? 'Testing...' : 'Test'}
+                    </button>
+                    {!adapter.active && adapter.available && (
+                      <button onClick={async () => {
+                        try {
+                          await newsAPI.updateSettings({ llm_adapter: adapter.name });
+                          await loadSettings();
+                          await loadAdditionalData();
+                          showMessage(`${adapter.name} is now the active adapter`, 'success');
+                        } catch (err) {
+                          showMessage(`Failed to set ${adapter.name} as active`, 'error');
+                        }
+                      }}>
+                        Set Active
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="settings-group">
+              <h3>LLM Settings</h3>
+              {settings.llm?.filter(s => s.key !== 'analysis_method').map(setting => (
+                <div key={setting.key} className="setting-item">
+                  <label>
+                    <span className="setting-label">{setting.description}</span>
+                    {setting.type === 'boolean' ? (
+                      <input 
+                        type="checkbox" 
+                        checked={setting.value}
+                        onChange={(e) => updateSetting('llm', setting.key, e.target.checked)}
+                      />
+                    ) : setting.type === 'number' ? (
+                      <input 
+                        type="number" 
+                        value={setting.value}
+                        step="0.1"
+                        onChange={(e) => updateSetting('llm', setting.key, parseFloat(e.target.value))}
+                      />
+                    ) : (
+                      <input 
+                        type="text" 
+                        value={setting.value}
+                        onChange={(e) => updateSetting('llm', setting.key, e.target.value)}
+                      />
+                    )}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'database' && (
+          <div className="settings-section">
+            <h2>Database Management</h2>
+            <p className="section-description">
+              Monitor database size, manage storage, and perform maintenance tasks.
             </p>
             
             {dataStats && (
@@ -615,6 +785,7 @@ function Settings() {
             )}
 
             <div className="settings-group">
+              <h3>Storage Settings</h3>
               {settings.data?.map(setting => (
                 <div key={setting.key} className="setting-item">
                   <label>
@@ -644,51 +815,84 @@ function Settings() {
             </div>
 
             <div className="data-actions">
-              <h3>Actions</h3>
-              <div className="cleanup-controls" style={{marginBottom: '1rem'}}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem'}}>
-                  <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                    Delete articles older than
-                    <input 
-                      type="number" 
-                      value={cleanupDays}
-                      onChange={(e) => setCleanupDays(e.target.value)}
-                      style={{width: '80px', padding: '0.25rem'}}
-                      min="0"
-                    />
-                    days
-                  </label>
-                  <button onClick={cleanupData} className="button">Clean Old Articles</button>
+              <h3>Maintenance</h3>
+              
+              <div className="maintenance-section">
+                <h4>Article Cleanup</h4>
+                <div className="cleanup-controls">
+                  <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem'}}>
+                    <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                      Delete articles older than
+                      <input 
+                        type="number" 
+                        value={cleanupDays}
+                        onChange={(e) => setCleanupDays(e.target.value)}
+                        style={{width: '80px', padding: '0.25rem'}}
+                        min="0"
+                      />
+                      days
+                    </label>
+                    <button onClick={cleanupData} className="button">Clean Articles</button>
+                  </div>
+                  <small style={{color: '#666'}}>Tip: Use 0 to delete ALL articles</small>
                 </div>
-                <small style={{color: '#666'}}>Tip: Use 0 to delete ALL articles</small>
               </div>
-              <div className="action-buttons">
-                <button onClick={triggerClustering}>Run Clustering</button>
-                <button onClick={clearClusters}>Clear All Clusters</button>
-                <button onClick={clearCache}>Clear LLM Cache</button>
-                <button onClick={() => exportData('all')}>Export All Data</button>
-                <button onClick={() => exportData('settings')}>Export Settings</button>
-                <button onClick={() => exportData('sources')}>Export Sources</button>
+
+              <div className="maintenance-section">
+                <h4>Cache Management</h4>
+                <button onClick={clearCache}>🗑️ Clear LLM Cache</button>
+              </div>
+
+              <div className="maintenance-section">
+                <h4>Backup & Export</h4>
+                <div className="action-buttons">
+                  <button onClick={() => exportData('all')}>📦 Export All Data</button>
+                  <button onClick={() => exportData('settings')}>⚙️ Export Settings</button>
+                  <button onClick={() => exportData('sources')}>📰 Export Sources</button>
+                </div>
               </div>
             </div>
 
-            <div className="settings-actions">
-              <button onClick={() => saveSettings('data')} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Data Settings'}
-              </button>
-              <button onClick={() => resetSettings('data')} className="secondary">
-                Reset to Defaults
-              </button>
+            <div className="settings-group">
+              <h3>Automated Maintenance</h3>
+              {jobs.filter(j => j.job_name === 'cleanup' || j.job_name === 'backup').map(job => (
+                <div key={job.job_name} className="job-config">
+                  <h4>{job.job_name.charAt(0).toUpperCase() + job.job_name.slice(1)}</h4>
+                  <div className="job-header">
+                    <div className="job-status">
+                      <span className={`status-dot ${job.enabled ? 'enabled' : 'disabled'}`} />
+                      {job.enabled ? 'Enabled' : 'Disabled'}
+                    </div>
+                    <button 
+                      onClick={() => toggleJob(job.job_name)}
+                      className={job.enabled ? 'disable-button' : 'enable-button'}
+                    >
+                      {job.enabled ? 'Disable' : 'Enable'}
+                    </button>
+                  </div>
+                  
+                  <div className="job-schedule">
+                    <label>
+                      Schedule (cron expression):
+                      <input 
+                        type="text" 
+                        value={job.cron_expression}
+                        onChange={(e) => updateJobSchedule(job.job_name, e.target.value)}
+                        onBlur={() => updateJobSchedule(job.job_name, job.cron_expression)}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {activeTab === 'content' && (
+        {activeTab === 'privacy' && (
           <div className="settings-section">
-            <h2>Content Filtering & Research Mode</h2>
+            <h2>Privacy & Content Filtering</h2>
             <p className="section-description">
-              Control content filtering and safety settings. Research mode allows access to 
-              potentially controversial content for academic or journalistic purposes.
+              Control content filtering, safety settings, and research mode access.
             </p>
             
             <div className="settings-group">
@@ -736,24 +940,14 @@ function Settings() {
               💡 <strong>What is Research Mode?</strong> In Safe Mode, the system filters out potentially harmful or controversial content. 
               Research Mode disables these filters for academic, journalistic, or research purposes where access to all content is necessary.
             </div>
-
-            <div className="settings-actions">
-              <button onClick={() => saveSettings('content')} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Content Settings'}
-              </button>
-              <button onClick={() => resetSettings('content')} className="secondary">
-                Reset to Defaults
-              </button>
-            </div>
           </div>
         )}
 
         {activeTab === 'display' && (
           <div className="settings-section">
-            <h2>Display & UI Preferences</h2>
+            <h2>Display Settings</h2>
             <p className="section-description">
-              Customize how articles and data are displayed in the interface. 
-              Set your preferred view options and date formatting.
+              Customize how articles and information are displayed in the interface.
             </p>
             
             <div className="settings-group">
@@ -761,27 +955,7 @@ function Settings() {
                 <div key={setting.key} className="setting-item">
                   <label>
                     <span className="setting-label">{setting.description}</span>
-                    {setting.key === 'default_bias_view' ? (
-                      <select 
-                        value={setting.value}
-                        onChange={(e) => updateSetting('display', setting.key, e.target.value)}
-                      >
-                        <option value="all">All</option>
-                        <option value="left">Left</option>
-                        <option value="center-left">Center-Left</option>
-                        <option value="center">Center</option>
-                        <option value="center-right">Center-Right</option>
-                        <option value="right">Right</option>
-                      </select>
-                    ) : setting.key === 'date_format' ? (
-                      <select 
-                        value={setting.value}
-                        onChange={(e) => updateSetting('display', setting.key, e.target.value)}
-                      >
-                        <option value="relative">Relative (2 hours ago)</option>
-                        <option value="absolute">Absolute (Dec 1, 2024)</option>
-                      </select>
-                    ) : setting.type === 'boolean' ? (
+                    {setting.type === 'boolean' ? (
                       <input 
                         type="checkbox" 
                         checked={setting.value}
@@ -804,30 +978,14 @@ function Settings() {
                 </div>
               ))}
             </div>
-
-            <div className="settings-actions">
-              <button onClick={() => saveSettings('display')} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Display Settings'}
-              </button>
-              <button onClick={() => resetSettings('display')} className="secondary">
-                Reset to Defaults
-              </button>
-            </div>
           </div>
         )}
       </div>
-      
-      {confirmAction && (
-        <ConfirmDialog
-          message={confirmAction.message}
-          onConfirm={confirmAction.onConfirm}
-          onCancel={() => setConfirmAction(null)}
-        />
-      )}
     </div>
   );
 }
 
+// Source Form Component
 function SourceForm({ source, onSave, onCancel }) {
   const [formData, setFormData] = useState({
     name: source.name || '',
@@ -836,7 +994,6 @@ function SourceForm({ source, onSave, onCancel }) {
     api_url: source.api_url || '',
     bias: source.bias || 'center',
     bias_score: source.bias_score || 0,
-    notes: source.notes || '',
     active: source.active !== undefined ? source.active : true,
     scraping_enabled: source.scraping_enabled || false,
     ...source
@@ -853,11 +1010,11 @@ function SourceForm({ source, onSave, onCancel }) {
       
       <div className="form-group">
         <label>
-          Name *
+          Source Name *
           <input 
             type="text" 
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={e => setFormData({...formData, name: e.target.value})}
             required
           />
         </label>
@@ -865,11 +1022,22 @@ function SourceForm({ source, onSave, onCancel }) {
 
       <div className="form-group">
         <label>
-          Website URL *
+          Website URL
           <input 
             type="url" 
             value={formData.url}
-            onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+            onChange={e => setFormData({...formData, url: e.target.value})}
+          />
+        </label>
+      </div>
+
+      <div className="form-group">
+        <label>
+          RSS Feed URL *
+          <input 
+            type="url" 
+            value={formData.rss_url}
+            onChange={e => setFormData({...formData, rss_url: e.target.value})}
             required
           />
         </label>
@@ -877,92 +1045,70 @@ function SourceForm({ source, onSave, onCancel }) {
 
       <div className="form-group">
         <label>
-          RSS Feed URL
-          <input 
-            type="url" 
-            value={formData.rss_url}
-            onChange={(e) => setFormData({ ...formData, rss_url: e.target.value })}
-          />
-        </label>
-      </div>
-
-      <div className="form-group">
-        <label>
-          API URL
+          API URL (optional)
           <input 
             type="url" 
             value={formData.api_url}
-            onChange={(e) => setFormData({ ...formData, api_url: e.target.value })}
+            onChange={e => setFormData({...formData, api_url: e.target.value})}
           />
         </label>
-      </div>
-
-      <div className="form-row">
-        <div className="form-group">
-          <label>
-            Political Bias *
-            <select 
-              value={formData.bias}
-              onChange={(e) => setFormData({ ...formData, bias: e.target.value })}
-              required
-            >
-              <option value="left">Left</option>
-              <option value="center-left">Center-Left</option>
-              <option value="center">Center</option>
-              <option value="center-right">Center-Right</option>
-              <option value="right">Right</option>
-            </select>
-          </label>
-        </div>
-
-        <div className="form-group">
-          <label>
-            Bias Score (-1 to 1)
-            <input 
-              type="number" 
-              value={formData.bias_score}
-              min="-1" 
-              max="1" 
-              step="0.1"
-              onChange={(e) => setFormData({ ...formData, bias_score: parseFloat(e.target.value) })}
-            />
-          </label>
-        </div>
       </div>
 
       <div className="form-group">
         <label>
-          Notes
-          <textarea 
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            rows="3"
+          Bias
+          <select 
+            value={formData.bias}
+            onChange={e => setFormData({...formData, bias: e.target.value})}
+          >
+            <option value="far-left">Far Left</option>
+            <option value="left">Left</option>
+            <option value="center-left">Center Left</option>
+            <option value="center">Center</option>
+            <option value="center-right">Center Right</option>
+            <option value="right">Right</option>
+            <option value="far-right">Far Right</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="form-group">
+        <label>
+          Bias Score (-100 to 100)
+          <input 
+            type="number" 
+            min="-100" 
+            max="100"
+            value={formData.bias_score}
+            onChange={e => setFormData({...formData, bias_score: parseInt(e.target.value)})}
           />
         </label>
       </div>
 
-      <div className="form-checkboxes">
+      <div className="form-group">
         <label>
           <input 
             type="checkbox" 
             checked={formData.active}
-            onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+            onChange={e => setFormData({...formData, active: e.target.checked})}
           />
           Active
         </label>
-        
+      </div>
+
+      <div className="form-group">
         <label>
           <input 
             type="checkbox" 
             checked={formData.scraping_enabled}
-            onChange={(e) => setFormData({ ...formData, scraping_enabled: e.target.checked })}
+            onChange={e => setFormData({...formData, scraping_enabled: e.target.checked})}
           />
-          Enable Scraping
+          Enable Web Scraping (for full article content)
         </label>
       </div>
 
       <div className="form-actions">
-        <button type="submit">Save Source</button>
+        <button type="submit">Save</button>
         <button type="button" onClick={onCancel} className="secondary">Cancel</button>
       </div>
     </form>
