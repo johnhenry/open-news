@@ -175,7 +175,7 @@ export async function registerRoutes(fastify) {
         api_url: api_url || null,
         bias,
         bias_score: bias_score || 0,
-        scraping_enabled: scraping_enabled || false,
+        scraping_enabled: scraping_enabled ? 1 : 0,
         notes: notes || null
       });
       

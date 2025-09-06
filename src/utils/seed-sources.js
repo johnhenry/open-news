@@ -38,7 +38,7 @@ async function seedSources() {
           api_url: source.api_url || null,
           bias: source.bias,
           bias_score: source.bias_score || 0,
-          scraping_enabled: source.scraping_enabled || false,
+          scraping_enabled: source.scraping_enabled ? 1 : 0,
           notes: source.notes || null
         });
         
