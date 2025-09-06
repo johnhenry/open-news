@@ -140,6 +140,16 @@ export const newsAPI = {
     return response.data;
   },
 
+  async triggerClustering() {
+    const response = await api.post('/settings/trigger-clustering');
+    return response.data;
+  },
+
+  async clearClusters() {
+    const response = await api.post('/settings/data/clear-clusters');
+    return response.data;
+  },
+
   async exportData(type) {
     const response = await api.get('/settings/data/export', { params: { type } });
     return response.data;

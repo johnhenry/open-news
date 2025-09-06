@@ -7,6 +7,7 @@ import { dirname, join } from 'path';
 import { registerRoutes } from './api/routes.js';
 import { registerSettingsRoutes } from './api/settings-routes.js';
 import migrate from './db/migrate.js';
+import { initializeScheduler } from './jobs/scheduler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -47,6 +48,9 @@ async function start() {
   try {
     console.log('🔄 Running database migrations...');
     migrate();
+    
+    console.log('📅 Initializing scheduler...');
+    await initializeScheduler();
     
     const port = parseInt(process.env.API_PORT || '3001');
     const host = process.env.HOST || '0.0.0.0';

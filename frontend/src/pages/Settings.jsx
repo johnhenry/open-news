@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { newsAPI } from '../services/api';
+import ConfirmDialog from '../components/ConfirmDialog';
 import './Settings.css';
 
 function Settings() {
@@ -23,6 +24,10 @@ function Settings() {
   
   // Data stats
   const [dataStats, setDataStats] = useState(null);
+  
+  // Confirmation dialog state
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [cleanupDays, setCleanupDays] = useState(30);
 
   useEffect(() => {
     loadSettings();
@@ -164,25 +169,30 @@ function Settings() {
   }
 
   async function clearCache() {
-    if (!confirm('Clear all LLM cache?')) return;
-    
-    try {
-      await newsAPI.clearCache('llm');
-      await loadAdditionalData();
-      showMessage('Cache cleared', 'success');
-    } catch (err) {
-      showMessage('Failed to clear cache', 'error');
-    }
+    setConfirmAction({
+      message: 'Clear all LLM cache?',
+      onConfirm: async () => {
+        try {
+          await newsAPI.clearCache('llm');
+          await loadAdditionalData();
+          showMessage('Cache cleared', 'success');
+        } catch (err) {
+          showMessage('Failed to clear cache', 'error');
+        }
+        setConfirmAction(null);
+      }
+    });
   }
 
   async function cleanupData() {
-    const days = prompt('Delete articles older than (days):', '30');
-    if (!days) return;
-    
     try {
-      const result = await newsAPI.cleanupData(parseInt(days));
+      const days = parseInt(cleanupDays);
+      const result = await newsAPI.cleanupData(days);
       await loadAdditionalData();
-      showMessage(`Deleted ${result.deleted} old articles`, 'success');
+      const message = days === 0 
+        ? `Deleted ${result.deleted} articles (cleared all)`
+        : `Deleted ${result.deleted} articles older than ${days} days`;
+      showMessage(message, 'success');
     } catch (err) {
       showMessage('Failed to cleanup data', 'error');
     }
@@ -202,6 +212,33 @@ function Settings() {
     } catch (err) {
       showMessage('Failed to export data', 'error');
     }
+  }
+
+  async function triggerClustering() {
+    try {
+      showMessage('Running clustering...', 'info');
+      const result = await newsAPI.triggerClustering();
+      await loadAdditionalData();
+      showMessage(`Clustering complete: ${result.clusters_created} clusters created from ${result.articles_processed} articles`, 'success');
+    } catch (err) {
+      showMessage('Failed to run clustering', 'error');
+    }
+  }
+
+  async function clearClusters() {
+    setConfirmAction({
+      message: 'Clear all clusters? This will remove all article groupings.',
+      onConfirm: async () => {
+        try {
+          const result = await newsAPI.clearClusters();
+          await loadAdditionalData();
+          showMessage(`Cleared ${result.deleted} clusters`, 'success');
+        } catch (err) {
+          showMessage('Failed to clear clusters', 'error');
+        }
+        setConfirmAction(null);
+      }
+    });
   }
 
   function showMessage(text, type) {
@@ -283,6 +320,15 @@ function Settings() {
               For cloud AI, add API keys to your .env file.
             </div>
             
+            <div className="info-box" style={{marginTop: '1rem'}}>
+              📊 <strong>Analysis Methods:</strong>
+              <ul style={{marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem'}}>
+                <li><strong>Source Default:</strong> Use the source's configured bias (fastest, no processing)</li>
+                <li><strong>Keyword-Based:</strong> Local sentiment and keyword analysis (moderate speed, privacy-focused)</li>
+                <li><strong>LLM-Powered:</strong> AI-based bias detection (slowest, most accurate)</li>
+              </ul>
+            </div>
+            
             <div className="adapters-grid">
               {adapters.map(adapter => (
                 <div key={adapter.name} className={`adapter-card ${adapter.active ? 'active' : ''}`}>
@@ -337,7 +383,16 @@ function Settings() {
                 <div key={setting.key} className="setting-item">
                   <label>
                     <span className="setting-label">{setting.description}</span>
-                    {setting.type === 'boolean' ? (
+                    {setting.key === 'analysis_method' ? (
+                      <select 
+                        value={setting.value}
+                        onChange={(e) => updateSetting('llm', setting.key, e.target.value)}
+                      >
+                        <option value="source_default">Source Default (No Analysis)</option>
+                        <option value="keyword">Keyword-Based (Local)</option>
+                        <option value="llm">LLM-Powered (AI)</option>
+                      </select>
+                    ) : setting.type === 'boolean' ? (
                       <input 
                         type="checkbox" 
                         checked={setting.value}
@@ -547,9 +602,27 @@ function Settings() {
 
             <div className="data-actions">
               <h3>Actions</h3>
+              <div className="cleanup-controls" style={{marginBottom: '1rem'}}>
+                <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem'}}>
+                  <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                    Delete articles older than
+                    <input 
+                      type="number" 
+                      value={cleanupDays}
+                      onChange={(e) => setCleanupDays(e.target.value)}
+                      style={{width: '80px', padding: '0.25rem'}}
+                      min="0"
+                    />
+                    days
+                  </label>
+                  <button onClick={cleanupData} className="button">Clean Old Articles</button>
+                </div>
+                <small style={{color: '#666'}}>Tip: Use 0 to delete ALL articles</small>
+              </div>
               <div className="action-buttons">
+                <button onClick={triggerClustering}>Run Clustering</button>
+                <button onClick={clearClusters}>Clear All Clusters</button>
                 <button onClick={clearCache}>Clear LLM Cache</button>
-                <button onClick={cleanupData}>Clean Old Articles</button>
                 <button onClick={() => exportData('all')}>Export All Data</button>
                 <button onClick={() => exportData('settings')}>Export Settings</button>
                 <button onClick={() => exportData('sources')}>Export Sources</button>
@@ -700,6 +773,14 @@ function Settings() {
           </div>
         )}
       </div>
+      
+      {confirmAction && (
+        <ConfirmDialog
+          message={confirmAction.message}
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
     </div>
   );
 }

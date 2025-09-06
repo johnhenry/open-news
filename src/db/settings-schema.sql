@@ -61,6 +61,7 @@ INSERT OR IGNORE INTO settings (key, value, type, category, description, default
   ('llm_auto_analyze', 'false', 'boolean', 'llm', 'Automatically analyze new articles', 'false'),
   ('llm_confidence_threshold', '0.7', 'number', 'llm', 'Minimum confidence for LLM results', '0.7'),
   ('llm_cache_ttl', '86400', 'number', 'llm', 'Cache TTL in seconds', '86400'),
+  ('analysis_method', 'source_default', 'string', 'llm', 'Article analysis method (source_default, keyword, llm)', 'source_default'),
   
   -- Ingestion Settings
   ('ingestion_enabled', 'true', 'boolean', 'ingestion', 'Enable automatic ingestion', 'true'),

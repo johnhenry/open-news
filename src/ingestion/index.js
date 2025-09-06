@@ -18,7 +18,7 @@ export async function runIngestion(sourceId = null) {
       let articles = [];
       
       if (source.rss_url) {
-        articles = await fetchRSSFeed(source.rss_url, source.id);
+        articles = await fetchRSSFeed(source);
       } else if (source.api_url) {
         // TODO: Implement API ingestion
         console.log(`⚠️  API ingestion not yet implemented for ${source.name}`);

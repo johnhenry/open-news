@@ -6,6 +6,7 @@ function Sources() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [ingesting, setIngesting] = useState(false);
+  const [message, setMessage] = useState(null);
 
   useEffect(() => {
     loadSources();
@@ -23,13 +24,18 @@ function Sources() {
     }
   }
 
+  function showMessage(text, type = 'info') {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 5000);
+  }
+
   async function triggerIngestion(sourceId = null) {
     try {
       setIngesting(true);
       const result = await newsAPI.triggerIngestion(sourceId);
-      alert(`Ingestion completed: ${result.results.length} sources processed`);
+      showMessage(`Ingestion completed: ${result.results.length} sources processed`, 'success');
     } catch (err) {
-      alert(`Ingestion failed: ${err.message}`);
+      showMessage(`Ingestion failed: ${err.message}`, 'error');
     } finally {
       setIngesting(false);
     }
@@ -43,6 +49,19 @@ function Sources() {
 
   return (
     <div className="sources-page">
+      {message && (
+        <div className={`message message-${message.type}`} style={{
+          padding: '1rem',
+          marginBottom: '1rem',
+          borderRadius: '4px',
+          backgroundColor: message.type === 'success' ? '#d4edda' : '#f8d7da',
+          color: message.type === 'success' ? '#155724' : '#721c24',
+          border: `1px solid ${message.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`
+        }}>
+          {message.text}
+        </div>
+      )}
+      
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <h1>News Sources</h1>
         <button 

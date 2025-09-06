@@ -12,16 +12,15 @@ export async function initializeScheduler() {
   // Initialize scheduled jobs in database
   await initializeJobs();
   
-  // Schedule ingestion
-  if (Settings.isIngestionEnabled()) {
-    const interval = Settings.getIngestionInterval();
-    await scheduleIngestion(interval);
+  // Schedule based on scheduled_jobs table, not settings
+  const ingestionJob = ScheduledJobs.get('ingestion');
+  if (ingestionJob && ingestionJob.enabled) {
+    await scheduleIngestion(ingestionJob.cron_expression);
   }
   
-  // Schedule clustering
-  if (Settings.isClusteringEnabled()) {
-    const interval = Settings.get('clustering_interval');
-    await scheduleClustering(interval);
+  const clusteringJob = ScheduledJobs.get('clustering');
+  if (clusteringJob && clusteringJob.enabled) {
+    await scheduleClustering(clusteringJob.cron_expression);
   }
 }
 
@@ -76,6 +75,7 @@ export async function scheduleIngestion(cronExpression = null) {
       }
     });
     
+    ingestionJob.start(); // Actually start the cron job!
     console.log(`📅 Scheduled ingestion: ${cronExpression}`);
     
     ScheduledJobs.update('ingestion', {
@@ -127,6 +127,7 @@ export async function scheduleClustering(cronExpression = null) {
       }
     });
     
+    clusteringJob.start(); // Actually start the cron job!
     console.log(`📅 Scheduled clustering: ${cronExpression}`);
     
     ScheduledJobs.update('clustering', {
@@ -137,10 +138,21 @@ export async function scheduleClustering(cronExpression = null) {
   }
 }
 
-// Helper to calculate next run time
+// Helper to calculate next run time (simplified - just estimate based on expression)
 function getNextRun(cronExpression) {
-  const interval = cron.parseExpression(cronExpression);
-  return interval.next().toISOString();
+  // For now, just return a simple estimate
+  // TODO: Use a proper cron parser library if needed
+  const now = new Date();
+  if (cronExpression.includes('*/1 * * * *')) {
+    now.setMinutes(now.getMinutes() + 1);
+  } else if (cronExpression.includes('*/15 * * * *')) {
+    now.setMinutes(now.getMinutes() + 15);
+  } else if (cronExpression.includes('*/30 * * * *')) {
+    now.setMinutes(now.getMinutes() + 30);
+  } else {
+    now.setHours(now.getHours() + 1);
+  }
+  return now.toISOString();
 }
 
 // Manual trigger functions

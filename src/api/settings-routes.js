@@ -286,17 +286,84 @@ export async function registerSettingsRoutes(fastify) {
     return { success: true };
   });
 
+  // Trigger manual clustering
+  fastify.post('/api/settings/trigger-clustering', async (request, reply) => {
+    try {
+      const { runClustering } = await import('../jobs/cluster.js');
+      const result = await runClustering();
+      return { success: true, ...result };
+    } catch (error) {
+      reply.code(500).send({ error: error.message });
+    }
+  });
+
+  // Clear all clusters
+  fastify.post('/api/settings/data/clear-clusters', async (request, reply) => {
+    const db = getDb();
+    
+    try {
+      // Delete article-cluster mappings first
+      db.prepare('DELETE FROM article_clusters').run();
+      // Then delete clusters
+      const result = db.prepare('DELETE FROM clusters').run();
+      
+      return { success: true, deleted: result.changes };
+    } catch (error) {
+      reply.code(500).send({ error: error.message });
+    }
+  });
+
   // Clean old data
   fastify.post('/api/settings/data/cleanup', async (request, reply) => {
     const { days = 30 } = request.body;
     const db = getDb();
     
-    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    // Special case: 0 days means delete ALL articles
+    const cutoff = days === 0 
+      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Tomorrow's date to catch everything
+      : new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
     
+    // First, delete related records
+    // Delete entities for these articles
+    db.prepare(`
+      DELETE FROM entities 
+      WHERE article_id IN (
+        SELECT id FROM articles 
+        WHERE published_at < ?
+      )
+    `).run(cutoff);
+    
+    // Delete embeddings for these articles
+    db.prepare(`
+      DELETE FROM embeddings 
+      WHERE article_id IN (
+        SELECT id FROM articles 
+        WHERE published_at < ?
+      )
+    `).run(cutoff);
+    
+    // Delete LLM cache for these articles
+    db.prepare(`
+      DELETE FROM llm_analysis_cache 
+      WHERE article_id IN (
+        SELECT id FROM articles 
+        WHERE published_at < ?
+      )
+    `).run(cutoff);
+    
+    // Delete article-cluster mappings for these articles
+    db.prepare(`
+      DELETE FROM article_clusters 
+      WHERE article_id IN (
+        SELECT id FROM articles 
+        WHERE published_at < ?
+      )
+    `).run(cutoff);
+    
+    // Now delete the articles themselves
     const result = db.prepare(`
       DELETE FROM articles 
-      WHERE published_at < ? 
-      AND id NOT IN (SELECT article_id FROM article_clusters)
+      WHERE published_at < ?
     `).run(cutoff);
     
     return { success: true, deleted: result.changes };

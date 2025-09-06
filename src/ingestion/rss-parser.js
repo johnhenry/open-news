@@ -1,6 +1,8 @@
 import Parser from 'rss-parser';
 import { Article, IngestionLog } from '../db/models.js';
 import { extractContent } from './content-extractor.js';
+import { getArticleAnalyzer } from '../services/article-analyzer.js';
+import { Settings } from '../db/settings-model.js';
 
 const parser = new Parser({
   customFields: {
@@ -23,6 +25,10 @@ export async function fetchRSSFeed(source) {
     console.log(`📡 Fetching RSS feed for ${source.name}: ${source.rss_url}`);
     const feed = await parser.parseURL(source.rss_url);
     
+    // Get analyzer instance once for this feed
+    const analyzer = await getArticleAnalyzer();
+    const shouldAnalyze = Settings.get('analysis_method') !== 'source_default';
+    
     for (const item of feed.items) {
       try {
         if (Article.exists(item.link)) {
@@ -34,7 +40,8 @@ export async function fetchRSSFeed(source) {
           ? await extractContent(item.link, source.scraping_enabled)
           : null;
 
-        const article = {
+        // Prepare basic article data
+        let articleData = {
           source_id: source.id,
           title: item.title,
           url: item.link,
@@ -47,6 +54,16 @@ export async function fetchRSSFeed(source) {
           bias_score: source.bias_score,
           sentiment_score: 0
         };
+
+        // Analyze article if needed
+        if (shouldAnalyze && articleData.content) {
+          const analysis = await analyzer.analyzeArticle(articleData, source.bias);
+          articleData.bias = analysis.bias;
+          articleData.bias_score = analysis.bias_score;
+          articleData.sentiment_score = analysis.sentiment_score;
+        }
+
+        const article = articleData;
 
         const result = Article.create(article);
         results.success.push({

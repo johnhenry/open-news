@@ -3,7 +3,7 @@ import { Article } from '../db/models.js';
 import { clusterArticles } from '../clustering/cluster.js';
 import migrate from '../db/migrate.js';
 
-async function runClustering() {
+export async function runClustering() {
   console.log(`\n🔗 Starting clustering at ${new Date().toISOString()}`);
   
   try {
@@ -54,4 +54,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export default runClustering;
-export { runClustering };
