@@ -44,7 +44,8 @@ export async function fetchRSSFeed(source) {
           content: content?.text || item.contentEncoded || null,
           image_url: extractImageUrl(item),
           bias: source.bias,
-          bias_score: source.bias_score
+          bias_score: source.bias_score,
+          sentiment_score: 0
         };
 
         const result = Article.create(article);

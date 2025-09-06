@@ -1,8 +1,10 @@
 import natural from 'natural';
 import kmeans from 'ml-kmeans';
-import { euclidean } from 'ml-distance';
+import mlDistance from 'ml-distance';
 import { Article, Cluster, Embedding } from '../db/models.js';
 import { generateEmbedding } from './embeddings.js';
+
+const { euclidean } = mlDistance;
 
 const TfIdf = natural.TfIdf;
 

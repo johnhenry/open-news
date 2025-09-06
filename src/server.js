@@ -20,16 +20,26 @@ await fastify.register(cors, {
   credentials: true
 });
 
-await fastify.register(fastifyStatic, {
-  root: join(__dirname, '../frontend/build'),
-  prefix: '/'
-});
+// Only register static file serving if the build directory exists
+import fs from 'fs';
+const frontendBuildPath = join(__dirname, '../frontend/build');
+if (fs.existsSync(frontendBuildPath)) {
+  await fastify.register(fastifyStatic, {
+    root: frontendBuildPath,
+    prefix: '/',
+    wildcard: false
+  });
+  
+  // Serve index.html for all non-API routes (SPA support)
+  fastify.setNotFoundHandler((request, reply) => {
+    if (!request.url.startsWith('/api')) {
+      return reply.sendFile('index.html');
+    }
+    reply.code(404).send({ error: 'Not found' });
+  });
+}
 
 await registerRoutes(fastify);
-
-fastify.get('/*', async (request, reply) => {
-  return reply.sendFile('index.html');
-});
 
 async function start() {
   try {
