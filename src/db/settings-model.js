@@ -194,6 +194,9 @@ export class ScheduledJobs {
       if (key === 'config' && typeof value === 'object') {
         fields.push(`${key} = ?`);
         values.push(JSON.stringify(value));
+      } else if (key === 'enabled' && typeof value === 'boolean') {
+        fields.push(`${key} = ?`);
+        values.push(value ? 1 : 0);
       } else {
         fields.push(`${key} = ?`);
         values.push(value);

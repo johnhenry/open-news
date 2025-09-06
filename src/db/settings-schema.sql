@@ -87,6 +87,11 @@ INSERT OR IGNORE INTO settings (key, value, type, category, description, default
   ('show_confidence_scores', 'true', 'boolean', 'display', 'Show LLM confidence scores', 'true'),
   ('date_format', 'relative', 'string', 'display', 'Date format (relative/absolute)', 'relative');
 
+-- Default scheduled jobs
+INSERT OR IGNORE INTO scheduled_jobs (job_name, enabled, cron_expression, status) VALUES 
+  ('ingestion', 1, '*/15 * * * *', 'idle'),
+  ('clustering', 1, '*/30 * * * *', 'idle');
+
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_settings_category ON settings(category);
 CREATE INDEX IF NOT EXISTS idx_llm_cache_article ON llm_analysis_cache(article_id);
