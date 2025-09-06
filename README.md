@@ -1,0 +1,2 @@
+# open-news
+News Aggrigator
