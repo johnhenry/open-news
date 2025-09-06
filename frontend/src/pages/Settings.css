@@ -198,6 +198,61 @@
   margin: 10px 0;
 }
 
+.adapter-model {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.model-selector-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.adapter-model label {
+  font-weight: 500;
+  color: #475569;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.adapter-model select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: white;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adapter-model .refresh-models-btn {
+  padding: 0.375rem 0.75rem;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.adapter-model .refresh-models-btn:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.adapter-model .refresh-models-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .adapter-actions {
   display: flex;
   gap: 10px;

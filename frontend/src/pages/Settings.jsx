@@ -14,6 +14,8 @@ function Settings() {
   // LLM specific state
   const [adapters, setAdapters] = useState([]);
   const [testingAdapter, setTestingAdapter] = useState(null);
+  const [adapterModels, setAdapterModels] = useState({});
+  const [loadingModels, setLoadingModels] = useState({});
   
   // Sources state
   const [sources, setSources] = useState([]);
@@ -62,6 +64,22 @@ function Settings() {
       const adaptersData = await newsAPI.getLLMAdapters();
       setAdapters(adaptersData.adapters);
       
+      // Load models for available adapters
+      const models = {};
+      for (const adapter of adaptersData.adapters) {
+        if (adapter.available) {
+          try {
+            const modelData = await newsAPI.getAdapterModels(adapter.name);
+            models[adapter.name] = modelData.models;
+            // Set current model on adapter
+            adapter.currentModel = modelData.currentModel;
+          } catch (err) {
+            console.error(`Failed to load models for ${adapter.name}:`, err);
+          }
+        }
+      }
+      setAdapterModels(models);
+      
       // Load sources
       const sourcesData = await newsAPI.getSettingsSources();
       setSources(sourcesData.sources);
@@ -75,6 +93,41 @@ function Settings() {
       setDataStats(stats);
     } catch (err) {
       console.error('Failed to load additional data:', err);
+    }
+  }
+
+  async function fetchModelsForAdapter(adapterName) {
+    setLoadingModels({ ...loadingModels, [adapterName]: true });
+    try {
+      const modelData = await newsAPI.getAdapterModels(adapterName);
+      setAdapterModels({ ...adapterModels, [adapterName]: modelData.models });
+      
+      // Update adapter's current model
+      const updatedAdapters = adapters.map(a => 
+        a.name === adapterName ? { ...a, currentModel: modelData.currentModel } : a
+      );
+      setAdapters(updatedAdapters);
+    } catch (err) {
+      showMessage(`Failed to fetch models for ${adapterName}`, 'error');
+    } finally {
+      setLoadingModels({ ...loadingModels, [adapterName]: false });
+    }
+  }
+
+  async function updateAdapterModel(adapterName, modelId) {
+    try {
+      await newsAPI.updateSettings({ [`${adapterName}_model`]: modelId });
+      
+      // Update adapter's current model
+      const updatedAdapters = adapters.map(a => 
+        a.name === adapterName ? { ...a, currentModel: modelId } : a
+      );
+      setAdapters(updatedAdapters);
+      
+      showMessage(`Model updated for ${adapterName}`, 'success', 2000);
+      await loadSettings();
+    } catch (err) {
+      showMessage(`Failed to update model for ${adapterName}`, 'error');
     }
   }
 
@@ -686,6 +739,35 @@ function Settings() {
                   {adapter.name === 'gemini' && adapter.configured && !adapter.available && (
                     <p className="warning">⚠️ Gemini API key configured but connection failed</p>
                   )}
+                  
+                  {/* Model selector for available adapters */}
+                  {adapter.available && (
+                    <div className="adapter-model">
+                      <div className="model-selector-group">
+                        <label>Model:</label>
+                        <select 
+                          value={adapter.currentModel || ''}
+                          onChange={(e) => updateAdapterModel(adapter.name, e.target.value)}
+                          disabled={loadingModels[adapter.name]}
+                        >
+                          <option value="">Select a model...</option>
+                          {(adapterModels[adapter.name] || []).map(model => (
+                            <option key={model.id} value={model.id}>
+                              {model.name} {model.size ? `(${model.size})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <button 
+                          onClick={() => fetchModelsForAdapter(adapter.name)}
+                          disabled={loadingModels[adapter.name]}
+                          className="refresh-models-btn"
+                        >
+                          {loadingModels[adapter.name] ? 'Loading...' : 'Refresh'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="adapter-actions">
                     <button 
                       onClick={() => testAdapter(adapter.name)}
@@ -714,7 +796,7 @@ function Settings() {
 
             <div className="settings-group">
               <h3>LLM Settings</h3>
-              {settings.llm?.filter(s => s.key !== 'analysis_method').map(setting => (
+              {settings.llm?.filter(s => s.key !== 'analysis_method' && s.key !== 'llm_adapter').map(setting => (
                 <div key={setting.key} className="setting-item">
                   <label>
                     <span className="setting-label">{setting.description}</span>
@@ -786,7 +868,10 @@ function Settings() {
 
             <div className="settings-group">
               <h3>Storage Settings</h3>
-              {settings.data?.map(setting => (
+              {settings.data?.filter(setting => 
+                setting.key !== 'auto_cleanup_enabled' && 
+                setting.key !== 'database_backup_enabled'
+              ).map(setting => (
                 <div key={setting.key} className="setting-item">
                   <label>
                     <span className="setting-label">{setting.description}</span>
@@ -855,6 +940,17 @@ function Settings() {
 
             <div className="settings-group">
               <h3>Automated Maintenance</h3>
+              
+              {/* Info boxes explaining what backup and cleanup do */}
+              <div className="info-box" style={{marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px'}}>
+                <p style={{margin: '0 0 0.5rem 0', fontWeight: '500', color: '#0c4a6e'}}>ℹ️ About Automated Maintenance:</p>
+                <ul style={{margin: '0', paddingLeft: '1.5rem', color: '#0f172a'}}>
+                  <li><strong>Backup:</strong> Automatically exports your database (articles, sources, settings) to JSON files at scheduled intervals. Useful for data recovery and migration.</li>
+                  <li><strong>Cleanup:</strong> Automatically removes old articles from the database based on age criteria to manage storage space and maintain performance.</li>
+                </ul>
+                <p style={{margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#64748b'}}>Configure cron expressions to set when these tasks run (e.g., "0 2 * * *" for daily at 2 AM).</p>
+              </div>
+              
               {jobs.filter(j => j.job_name === 'cleanup' || j.job_name === 'backup').map(job => (
                 <div key={job.job_name} className="job-config">
                   <h4>{job.job_name.charAt(0).toUpperCase() + job.job_name.slice(1)}</h4>

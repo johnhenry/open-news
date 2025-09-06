@@ -63,6 +63,86 @@ export async function registerSettingsRoutes(fastify) {
     return { success: true, settings: Settings.getByCategory() };
   });
 
+  // Get models for a specific adapter
+  fastify.get('/api/settings/llm/adapters/:adapter/models', async (request, reply) => {
+    const { adapter } = request.params;
+    
+    try {
+      let models = [];
+      
+      switch(adapter) {
+        case 'ollama':
+          try {
+            const response = await fetch('http://localhost:11434/api/tags');
+            if (response.ok) {
+              const data = await response.json();
+              models = (data.models || []).map(m => ({ 
+                id: m.name, 
+                name: m.name,
+                size: m.size ? `${(m.size / 1024 / 1024 / 1024).toFixed(1)}GB` : undefined
+              }));
+            }
+          } catch (e) {
+            // Ollama not running
+          }
+          break;
+          
+        case 'openai':
+          // Common OpenAI models
+          models = [
+            { id: 'gpt-4-turbo-preview', name: 'GPT-4 Turbo' },
+            { id: 'gpt-4', name: 'GPT-4' },
+            { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
+            { id: 'gpt-3.5-turbo-16k', name: 'GPT-3.5 Turbo 16K' }
+          ];
+          break;
+          
+        case 'anthropic':
+          // Common Anthropic models
+          models = [
+            { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
+            { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
+            { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
+            { id: 'claude-2.1', name: 'Claude 2.1' },
+            { id: 'claude-2.0', name: 'Claude 2.0' }
+          ];
+          break;
+          
+        case 'gemini':
+          // Common Gemini models
+          models = [
+            { id: 'gemini-pro', name: 'Gemini Pro' },
+            { id: 'gemini-pro-vision', name: 'Gemini Pro Vision' }
+          ];
+          break;
+          
+        case 'lmstudio':
+          // LM Studio uses local models, fetch from endpoint if available
+          try {
+            const response = await fetch('http://localhost:1234/v1/models');
+            if (response.ok) {
+              const data = await response.json();
+              models = (data.data || []).map(m => ({ id: m.id, name: m.id }));
+            }
+          } catch (e) {
+            // LM Studio not running
+          }
+          break;
+      }
+      
+      // Get current model from settings
+      const currentModel = Settings.get(`${adapter}_model`) || '';
+      
+      return { 
+        models,
+        currentModel,
+        adapter
+      };
+    } catch (error) {
+      reply.code(500).send({ error: error.message });
+    }
+  });
+
   // LLM adapter management
   fastify.get('/api/settings/llm/adapters', async (request, reply) => {
     const manager = getLLMManager();

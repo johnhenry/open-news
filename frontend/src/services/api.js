@@ -77,6 +77,11 @@ export const newsAPI = {
     return response.data;
   },
 
+  async getAdapterModels(adapter) {
+    const response = await api.get(`/settings/llm/adapters/${adapter}/models`);
+    return response.data;
+  },
+
   async getAPIKeys() {
     const response = await api.get('/settings/api-keys');
     return response.data;
