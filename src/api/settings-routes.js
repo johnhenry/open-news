@@ -157,7 +157,9 @@ export async function registerSettingsRoutes(fastify) {
 
   // Source management
   fastify.get('/api/settings/sources', async (request, reply) => {
-    const sources = Source.getAll();
+    // Get ALL sources (including inactive) for settings management
+    const db = getDb();
+    const sources = db.prepare('SELECT * FROM sources ORDER BY name').all();
     const grouped = {};
     
     for (const source of sources) {
