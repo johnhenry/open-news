@@ -528,6 +528,49 @@ function Settings() {
                 </div>
               ))}
             </div>
+            
+            <div className="settings-group" style={{marginTop: '2rem'}}>
+              <h3>Clustering Parameters</h3>
+              <div className="setting-item">
+                <label>
+                  <span className="setting-label">Similarity Threshold</span>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                    <input 
+                      type="range"
+                      min="0.2"
+                      max="0.9"
+                      step="0.1"
+                      value={settings.ingestion?.find(s => s.key === 'similarity_threshold')?.value || 0.7}
+                      onChange={(e) => updateSetting('ingestion', 'similarity_threshold', e.target.value)}
+                      style={{flex: 1}}
+                    />
+                    <span style={{minWidth: '3rem', textAlign: 'right'}}>
+                      {settings.ingestion?.find(s => s.key === 'similarity_threshold')?.value || 0.7}
+                    </span>
+                  </div>
+                  <small style={{color: '#666', display: 'block', marginTop: '0.5rem'}}>
+                    Lower values group more diverse articles together (0.2 = very loose, 0.5 = moderate, 0.8 = strict)
+                  </small>
+                </label>
+              </div>
+              
+              <div className="setting-item">
+                <label>
+                  <span className="setting-label">Minimum Cluster Size</span>
+                  <input 
+                    type="number"
+                    min="2"
+                    max="10"
+                    value={settings.ingestion?.find(s => s.key === 'min_cluster_size')?.value || 2}
+                    onChange={(e) => updateSetting('ingestion', 'min_cluster_size', e.target.value)}
+                    style={{width: '100px'}}
+                  />
+                  <small style={{color: '#666', display: 'block', marginTop: '0.5rem'}}>
+                    Minimum number of articles required to form a cluster
+                  </small>
+                </label>
+              </div>
+            </div>
           </div>
         )}
 
