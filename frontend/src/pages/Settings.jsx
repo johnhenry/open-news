@@ -8,6 +8,7 @@ function Settings() {
   const [activeTab, setActiveTab] = useState('sources');
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [saveTimeout, setSaveTimeout] = useState(null);
@@ -23,7 +24,6 @@ function Settings() {
   const [sources, setSources] = useState([]);
   const [editingSource, setEditingSource] = useState(null);
   const [showAddSource, setShowAddSource] = useState(false);
-  const [loadingSources, setLoadingSources] = useState(true);
   const [savingSource, setSavingSource] = useState(false);
   const [deletingSource, setDeletingSource] = useState(null);
   const [togglingSource, setTogglingSource] = useState(null);
@@ -35,7 +35,6 @@ function Settings() {
   
   // Data stats
   const [dataStats, setDataStats] = useState(null);
-  const [loadingDataStats, setLoadingDataStats] = useState(true);
   const [cleaningData, setCleaningData] = useState(false);
   const [clearingClusters, setClearingClusters] = useState(false);
   const [clearingCache, setClearingCache] = useState(false);
@@ -47,8 +46,7 @@ function Settings() {
   const [cleanupDays, setCleanupDays] = useState(30);
 
   useEffect(() => {
-    loadSettings();
-    loadAdditionalData();
+    loadAllData();
   }, []);
 
   // Cleanup timeout on unmount
@@ -60,59 +58,54 @@ function Settings() {
     };
   }, [saveTimeout]);
 
-  async function loadSettings() {
+  async function loadAllData() {
     try {
       setLoading(true);
-      const data = await newsAPI.getSettings();
-      setSettings(data);
-    } catch (err) {
-      showMessage('Failed to load settings', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadAdditionalData() {
-    try {
-      // Load LLM adapters
-      const adaptersData = await newsAPI.getLLMAdapters();
+      setDataLoaded(false);
+      
+      // Load all data in parallel for better performance
+      const [settingsData, adaptersData, sourcesData, jobsData, stats] = await Promise.all([
+        newsAPI.getSettings(),
+        newsAPI.getLLMAdapters(),
+        newsAPI.getSettingsSources(),
+        newsAPI.getScheduledJobs(),
+        newsAPI.getDataStats()
+      ]);
+      
+      // Set basic data
+      setSettings(settingsData);
       setAdapters(adaptersData.adapters);
+      setSources(sourcesData.sources);
+      setJobs(jobsData);
+      setDataStats(stats);
       
       // Load models for available adapters
       const models = {};
+      const modelPromises = [];
       for (const adapter of adaptersData.adapters) {
         if (adapter.available) {
-          try {
-            const modelData = await newsAPI.getAdapterModels(adapter.name);
-            models[adapter.name] = modelData.models;
-            // Set current model on adapter
-            adapter.currentModel = modelData.currentModel;
-          } catch (err) {
-            console.error(`Failed to load models for ${adapter.name}:`, err);
-          }
+          modelPromises.push(
+            newsAPI.getAdapterModels(adapter.name)
+              .then(modelData => {
+                models[adapter.name] = modelData.models;
+                adapter.currentModel = modelData.currentModel;
+              })
+              .catch(err => {
+                console.error(`Failed to load models for ${adapter.name}:`, err);
+              })
+          );
         }
       }
+      
+      await Promise.all(modelPromises);
       setAdapterModels(models);
       
-      // Load sources
-      setLoadingSources(true);
-      const sourcesData = await newsAPI.getSettingsSources();
-      setSources(sourcesData.sources);
-      setLoadingSources(false);
-      
-      // Load jobs
-      const jobsData = await newsAPI.getScheduledJobs();
-      setJobs(jobsData);
-      
-      // Load data stats
-      setLoadingDataStats(true);
-      const stats = await newsAPI.getDataStats();
-      setDataStats(stats);
-      setLoadingDataStats(false);
+      setDataLoaded(true);
     } catch (err) {
-      console.error('Failed to load additional data:', err);
-      setLoadingSources(false);
-      setLoadingDataStats(false);
+      console.error('Failed to load settings data:', err);
+      showMessage('Failed to load settings data', 'error');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -445,7 +438,15 @@ function Settings() {
     autoSaveSettings(key, value);
   }
 
-  if (loading) return <LoadingSpinner text="Loading settings..." />;
+  // Show single loading spinner while any data is loading
+  if (loading) {
+    return (
+      <div className="settings-page">
+        <h1>Settings</h1>
+        <LoadingSpinner text="Loading settings..." />
+      </div>
+    );
+  }
 
   return (
     <div className="settings-page">
@@ -542,11 +543,8 @@ function Settings() {
               />
             )}
 
-            {loadingSources ? (
-              <LoadingSpinner text="Loading sources..." />
-            ) : (
-              <div className="sources-list">
-                {sources.map(source => (
+            <div className="sources-list">
+              {sources.map(source => (
                   <div key={source.id} className="source-item">
                     <div className="source-info">
                       <h4>{source.name}</h4>
@@ -589,9 +587,8 @@ function Settings() {
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         )}
 
@@ -603,17 +600,17 @@ function Settings() {
             </p>
             
             <div className="info-box">
-              📅 <strong>Cron Expression Guide:</strong> Use standard cron format
-              <ul style={{marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem'}}>
-                <li>"*/15 * * * *" = every 15 minutes</li>
-                <li>"0 */2 * * *" = every 2 hours</li>
-                <li>"0 9 * * *" = daily at 9am</li>
-              </ul>
-            </div>
-            
-            <div className="job-section">
-              <h3>Ingestion Schedule</h3>
-              {jobs.filter(j => j.job_name === 'ingestion').map(job => (
+                  📅 <strong>Cron Expression Guide:</strong> Use standard cron format
+                  <ul style={{marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem'}}>
+                    <li>"*/15 * * * *" = every 15 minutes</li>
+                    <li>"0 */2 * * *" = every 2 hours</li>
+                    <li>"0 9 * * *" = daily at 9am</li>
+                  </ul>
+                </div>
+                
+                <div className="job-section">
+                  <h3>Ingestion Schedule</h3>
+                  {jobs.filter(j => j.job_name === 'ingestion').map(job => (
                 <div key={job.job_name} className="job-config">
                   <div className="job-header">
                     <div className="job-status">
@@ -684,8 +681,8 @@ function Settings() {
             </p>
 
             <div className="job-section">
-              <h3>Clustering Schedule</h3>
-              {jobs.filter(j => j.job_name === 'clustering').map(job => (
+                  <h3>Clustering Schedule</h3>
+                  {jobs.filter(j => j.job_name === 'clustering').map(job => (
                 <div key={job.job_name} className="job-config">
                   <div className="job-header">
                     <div className="job-status">
@@ -995,9 +992,7 @@ function Settings() {
               Monitor database size, manage storage, and perform maintenance tasks.
             </p>
             
-            {loadingDataStats ? (
-              <LoadingSpinner text="Loading database statistics..." />
-            ) : dataStats && (
+            {dataStats && (
               <div className="data-stats">
                 <h3>Database Statistics</h3>
                 <div className="stats-grid">

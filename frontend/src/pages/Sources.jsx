@@ -63,23 +63,8 @@ function Sources() {
         </div>
       )}
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+      <div style={{ marginBottom: '30px' }}>
         <h1>News Sources</h1>
-        <button 
-          className="button" 
-          onClick={() => triggerIngestion()}
-          disabled={ingesting}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-        >
-          {ingesting ? (
-            <>
-              <LoadingSpinner size="small" inline />
-              Ingesting...
-            </>
-          ) : (
-            'Trigger Full Ingestion'
-          )}
-        </button>
       </div>
 
       <div className="card" style={{ marginBottom: '30px' }}>
