@@ -14,7 +14,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const fastify = Fastify({
   logger: {
     level: process.env.NODE_ENV === 'production' ? 'info' : 'debug'
-  }
+  },
+  // Connection settings for better parallel request handling
+  connectionTimeout: 0, // No timeout
+  keepAliveTimeout: 72000, // 72 seconds
+  maxRequestsPerSocket: 0, // No limit
+  requestTimeout: 30000 // 30 second request timeout
 });
 
 await fastify.register(cors, {
