@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { format } from 'date-fns';
 
 function ClusterDetail() {
@@ -31,7 +32,7 @@ function ClusterDetail() {
     }
   }
 
-  if (loading) return <div className="loading">Loading cluster details...</div>;
+  if (loading) return <LoadingSpinner text="Loading cluster details..." />;
   if (error) return <div className="error">Error: {error}</div>;
   if (!cluster || !comparison) return null;
 

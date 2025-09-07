@@ -93,7 +93,15 @@ export class BaseLLMAdapter {
       // Try to extract JSON from the response
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+        let jsonText = jsonMatch[0];
+        
+        // Fix common LLM JSON errors
+        // Add missing comma after "reasoning" field
+        jsonText = jsonText.replace(/"reasoning":\s*"[^"]*"\s*"indicators"/, (match) => {
+          return match.replace('"indicators"', ',"indicators"');
+        });
+        
+        return JSON.parse(jsonText);
       }
       
       // If no JSON found, try to parse the entire response
@@ -101,7 +109,14 @@ export class BaseLLMAdapter {
     } catch (error) {
       console.error('Failed to parse JSON response:', error);
       console.error('Raw response:', text);
-      return null;
+      
+      // Fallback: return a default response to avoid breaking the system
+      return {
+        bias_score: 0,
+        confidence: 0.5,
+        reasoning: "Failed to parse LLM response",
+        indicators: []
+      };
     }
   }
 

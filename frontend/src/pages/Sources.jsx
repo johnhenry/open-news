@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { newsAPI } from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 function Sources() {
   const [sources, setSources] = useState(null);
@@ -41,7 +42,7 @@ function Sources() {
     }
   }
 
-  if (loading) return <div className="loading">Loading sources...</div>;
+  if (loading) return <LoadingSpinner text="Loading sources..." />;
   if (error) return <div className="error">Error: {error}</div>;
   if (!sources) return null;
 
@@ -68,8 +69,16 @@ function Sources() {
           className="button" 
           onClick={() => triggerIngestion()}
           disabled={ingesting}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
         >
-          {ingesting ? 'Ingesting...' : 'Trigger Full Ingestion'}
+          {ingesting ? (
+            <>
+              <LoadingSpinner size="small" inline />
+              Ingesting...
+            </>
+          ) : (
+            'Trigger Full Ingestion'
+          )}
         </button>
       </div>
 

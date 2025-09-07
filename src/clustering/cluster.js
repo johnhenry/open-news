@@ -1,10 +1,9 @@
 import natural from 'natural';
 import kmeans from 'ml-kmeans';
-import mlDistance from 'ml-distance';
+import { euclidean } from 'ml-distance';
 import { Article, Cluster, Embedding } from '../db/models.js';
+import { Settings } from '../db/settings-model.js';
 import { generateEmbedding } from './embeddings.js';
-
-const { euclidean } = mlDistance;
 
 const TfIdf = natural.TfIdf;
 
@@ -14,12 +13,18 @@ export async function clusterArticles(articles) {
     return [];
   }
 
-  const keywordClusters = clusterByKeywords(articles);
+  // Get clustering parameters from settings
+  const minClusterSize = Settings.get('min_cluster_size') || 2;
+  const similarityThreshold = Settings.get('similarity_threshold') || 0.7;
+  
+  console.log(`Using clustering parameters: minClusterSize=${minClusterSize}, similarityThreshold=${similarityThreshold}`);
+
+  const keywordClusters = clusterByKeywords(articles, similarityThreshold, minClusterSize);
   
   const refinedClusters = [];
   for (const cluster of keywordClusters) {
-    if (cluster.length >= parseInt(process.env.MIN_CLUSTER_SIZE || '2')) {
-      const refined = await refineClusterWithEmbeddings(cluster);
+    if (cluster.length >= minClusterSize) {
+      const refined = await refineClusterWithEmbeddings(cluster, minClusterSize);
       refinedClusters.push(...refined);
     }
   }
@@ -38,7 +43,7 @@ export async function clusterArticles(articles) {
   return savedClusters;
 }
 
-function clusterByKeywords(articles) {
+function clusterByKeywords(articles, similarityThreshold, minClusterSize) {
   const tfidf = new TfIdf();
   
   articles.forEach(article => {
@@ -48,6 +53,12 @@ function clusterByKeywords(articles) {
 
   const clusters = [];
   const clustered = new Set();
+
+  // Use dynamic thresholds based on the similarity threshold setting
+  // Lower similarity threshold = more lenient clustering
+  const titleThreshold = Math.max(0.1, similarityThreshold * 0.4);
+  const tfidfThreshold = Math.max(0.1, similarityThreshold * 0.3);
+  const highSimilarityThreshold = Math.max(0.3, similarityThreshold * 0.7);
 
   articles.forEach((article, i) => {
     if (clustered.has(i)) return;
@@ -60,17 +71,17 @@ function clusterByKeywords(articles) {
 
       const similarity = calculateTitleSimilarity(article.title, otherArticle.title);
       
-      if (similarity > 0.3) {
+      if (similarity > titleThreshold) {
         const tfidfSimilarity = calculateTfidfSimilarity(tfidf, i, j);
         
-        if (tfidfSimilarity > 0.2 || similarity > 0.5) {
+        if (tfidfSimilarity > tfidfThreshold || similarity > highSimilarityThreshold) {
           cluster.push(otherArticle);
           clustered.add(j);
         }
       }
     });
 
-    if (cluster.length >= parseInt(process.env.MIN_CLUSTER_SIZE || '2')) {
+    if (cluster.length >= minClusterSize) {
       clusters.push(cluster);
     }
   });
@@ -115,8 +126,8 @@ function calculateTfidfSimilarity(tfidf, doc1, doc2) {
   return dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
 }
 
-async function refineClusterWithEmbeddings(articles) {
-  if (process.env.CONTENT_MODE !== 'research') {
+async function refineClusterWithEmbeddings(articles, minClusterSize) {
+  if (Settings.getContentMode() !== 'research') {
     return [articles];
   }
 
@@ -158,7 +169,7 @@ async function refineClusterWithEmbeddings(articles) {
     });
 
     return subclusters.filter(
-      cluster => cluster.length >= parseInt(process.env.MIN_CLUSTER_SIZE || '2')
+      cluster => cluster.length >= minClusterSize
     );
 
   } catch (error) {

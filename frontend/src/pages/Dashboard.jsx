@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const COLORS = {
@@ -38,7 +39,7 @@ function Dashboard() {
     }
   }
 
-  if (loading) return <div className="loading">Loading dashboard...</div>;
+  if (loading) return <LoadingSpinner text="Loading dashboard..." />;
   if (error) return <div className="error">Error: {error}</div>;
   if (!stats) return null;
 

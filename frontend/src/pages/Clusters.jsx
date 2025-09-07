@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 function Clusters() {
   const [clusters, setClusters] = useState([]);
@@ -23,7 +24,7 @@ function Clusters() {
     }
   }
 
-  if (loading) return <div className="loading">Loading clusters...</div>;
+  if (loading) return <LoadingSpinner text="Loading clusters..." />;
   if (error) return <div className="error">Error: {error}</div>;
 
   return (

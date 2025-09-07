@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { newsAPI } from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
+import LoadingSpinner from '../components/LoadingSpinner';
 import './Settings.css';
 
 function Settings() {
@@ -16,17 +17,30 @@ function Settings() {
   const [testingAdapter, setTestingAdapter] = useState(null);
   const [adapterModels, setAdapterModels] = useState({});
   const [loadingModels, setLoadingModels] = useState({});
+  const [settingActiveAdapter, setSettingActiveAdapter] = useState(null);
   
   // Sources state
   const [sources, setSources] = useState([]);
   const [editingSource, setEditingSource] = useState(null);
   const [showAddSource, setShowAddSource] = useState(false);
+  const [loadingSources, setLoadingSources] = useState(true);
+  const [savingSource, setSavingSource] = useState(false);
+  const [deletingSource, setDeletingSource] = useState(null);
+  const [togglingSource, setTogglingSource] = useState(null);
   
   // Jobs state
   const [jobs, setJobs] = useState([]);
+  const [togglingJob, setTogglingJob] = useState(null);
+  const [triggeringJob, setTriggeringJob] = useState(null);
   
   // Data stats
   const [dataStats, setDataStats] = useState(null);
+  const [loadingDataStats, setLoadingDataStats] = useState(true);
+  const [cleaningData, setCleaningData] = useState(false);
+  const [clearingClusters, setClearingClusters] = useState(false);
+  const [clearingCache, setClearingCache] = useState(false);
+  const [exportingData, setExportingData] = useState(null);
+  const [triggeringClustering, setTriggeringClustering] = useState(false);
   
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState(null);
@@ -81,18 +95,24 @@ function Settings() {
       setAdapterModels(models);
       
       // Load sources
+      setLoadingSources(true);
       const sourcesData = await newsAPI.getSettingsSources();
       setSources(sourcesData.sources);
+      setLoadingSources(false);
       
       // Load jobs
       const jobsData = await newsAPI.getScheduledJobs();
       setJobs(jobsData);
       
       // Load data stats
+      setLoadingDataStats(true);
       const stats = await newsAPI.getDataStats();
       setDataStats(stats);
+      setLoadingDataStats(false);
     } catch (err) {
       console.error('Failed to load additional data:', err);
+      setLoadingSources(false);
+      setLoadingDataStats(false);
     }
   }
 
@@ -208,6 +228,7 @@ function Settings() {
   // Source management functions
   async function saveSource(sourceData) {
     try {
+      setSavingSource(true);
       if (sourceData.id) {
         await newsAPI.updateSource(sourceData.id, sourceData);
         showMessage('Source updated successfully', 'success');
@@ -222,6 +243,8 @@ function Settings() {
       setShowAddSource(false);
     } catch (err) {
       showMessage('Failed to save source', 'error');
+    } finally {
+      setSavingSource(false);
     }
   }
 
@@ -231,12 +254,15 @@ function Settings() {
       message: 'Are you sure you want to delete this source? All articles from this source will also be deleted.',
       onConfirm: async () => {
         try {
+          setDeletingSource(sourceId);
           await newsAPI.deleteSource(sourceId);
           const sourcesData = await newsAPI.getSettingsSources();
           setSources(sourcesData.sources);
           showMessage('Source deleted successfully', 'success');
         } catch (err) {
           showMessage('Failed to delete source', 'error');
+        } finally {
+          setDeletingSource(null);
         }
         setConfirmAction(null);
       },
@@ -246,6 +272,7 @@ function Settings() {
 
   async function toggleSource(sourceId) {
     try {
+      setTogglingSource(sourceId);
       const source = sources.find(s => s.id === sourceId);
       await newsAPI.updateSource(sourceId, { active: !source.active });
       const sourcesData = await newsAPI.getSettingsSources();
@@ -253,6 +280,8 @@ function Settings() {
       showMessage(`Source ${source.active ? 'disabled' : 'enabled'}`, 'success');
     } catch (err) {
       showMessage('Failed to toggle source', 'error');
+    } finally {
+      setTogglingSource(null);
     }
   }
 
@@ -260,12 +289,15 @@ function Settings() {
   async function toggleJob(jobName) {
     const job = jobs.find(j => j.job_name === jobName);
     try {
+      setTogglingJob(jobName);
       await newsAPI.updateJob(jobName, { enabled: !job.enabled });
       const jobsData = await newsAPI.getScheduledJobs();
       setJobs(jobsData);
       showMessage(`${jobName} ${job.enabled ? 'disabled' : 'enabled'}`, 'success');
     } catch (err) {
       showMessage(`Failed to toggle ${jobName}`, 'error');
+    } finally {
+      setTogglingJob(null);
     }
   }
 
@@ -282,6 +314,7 @@ function Settings() {
 
   async function triggerJob(jobName) {
     try {
+      setTriggeringJob(jobName);
       if (jobName === 'ingestion') {
         await newsAPI.triggerIngestion();
         showMessage('Ingestion started', 'success');
@@ -291,6 +324,8 @@ function Settings() {
       }
     } catch (err) {
       showMessage(`Failed to trigger ${jobName}`, 'error');
+    } finally {
+      setTriggeringJob(null);
     }
   }
 
@@ -304,12 +339,15 @@ function Settings() {
         : `Are you sure you want to delete articles older than ${days} days?`,
       onConfirm: async () => {
         try {
+          setCleaningData(true);
           await newsAPI.cleanupOldArticles(days);
           const stats = await newsAPI.getDataStats();
           setDataStats(stats);
           showMessage(days === 0 ? 'All articles deleted' : `Old articles cleaned (${days} days)`, 'success');
         } catch (err) {
           showMessage('Failed to cleanup articles', 'error');
+        } finally {
+          setCleaningData(false);
         }
         setConfirmAction(null);
       },
@@ -323,12 +361,15 @@ function Settings() {
       message: 'Are you sure you want to delete all article clusters?',
       onConfirm: async () => {
         try {
+          setClearingClusters(true);
           await newsAPI.clearClusters();
           const stats = await newsAPI.getDataStats();
           setDataStats(stats);
           showMessage('All clusters cleared', 'success');
         } catch (err) {
           showMessage('Failed to clear clusters', 'error');
+        } finally {
+          setClearingClusters(false);
         }
         setConfirmAction(null);
       },
@@ -342,12 +383,15 @@ function Settings() {
       message: 'Are you sure you want to clear the LLM response cache?',
       onConfirm: async () => {
         try {
+          setClearingCache(true);
           await newsAPI.clearCache();
           const stats = await newsAPI.getDataStats();
           setDataStats(stats);
           showMessage('Cache cleared successfully', 'success');
         } catch (err) {
           showMessage('Failed to clear cache', 'error');
+        } finally {
+          setClearingCache(false);
         }
         setConfirmAction(null);
       },
@@ -357,6 +401,7 @@ function Settings() {
 
   async function exportData(type) {
     try {
+      setExportingData(type);
       const data = await newsAPI.exportData(type);
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -370,15 +415,20 @@ function Settings() {
       showMessage(`Exported ${type} data`, 'success');
     } catch (err) {
       showMessage(`Failed to export ${type}`, 'error');
+    } finally {
+      setExportingData(null);
     }
   }
 
   async function triggerClustering() {
     try {
+      setTriggeringClustering(true);
       await newsAPI.triggerClustering();
       showMessage('Clustering started', 'success');
     } catch (err) {
       showMessage('Failed to trigger clustering', 'error');
+    } finally {
+      setTriggeringClustering(false);
     }
   }
 
@@ -395,7 +445,7 @@ function Settings() {
     autoSaveSettings(key, value);
   }
 
-  if (loading) return <div className="loading">Loading settings...</div>;
+  if (loading) return <LoadingSpinner text="Loading settings..." />;
 
   return (
     <div className="settings-page">
@@ -488,34 +538,60 @@ function Settings() {
                   setEditingSource(null);
                   setShowAddSource(false);
                 }}
+                savingSource={savingSource}
               />
             )}
 
-            <div className="sources-list">
-              {sources.map(source => (
-                <div key={source.id} className="source-item">
-                  <div className="source-info">
-                    <h4>{source.name}</h4>
-                    <span className={`bias-badge bias-${source.bias}`}>{source.bias}</span>
-                    <span className={`status ${source.active ? 'active' : 'inactive'}`}>
-                      {source.active ? 'Active' : 'Inactive'}
-                    </span>
+            {loadingSources ? (
+              <LoadingSpinner text="Loading sources..." />
+            ) : (
+              <div className="sources-list">
+                {sources.map(source => (
+                  <div key={source.id} className="source-item">
+                    <div className="source-info">
+                      <h4>{source.name}</h4>
+                      <span className={`bias-badge bias-${source.bias}`}>{source.bias}</span>
+                      <span className={`status ${source.active ? 'active' : 'inactive'}`}>
+                        {source.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="source-actions">
+                      <button 
+                        onClick={() => toggleSource(source.id)}
+                        className={source.active ? 'active-toggle' : 'inactive-toggle'}
+                        disabled={togglingSource === source.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        {togglingSource === source.id ? (
+                          <>
+                            <LoadingSpinner size="small" inline />
+                            Updating...
+                          </>
+                        ) : (
+                          source.active ? '✓ Enabled' : '○ Disabled'
+                        )}
+                      </button>
+                      <button onClick={() => setEditingSource(source)}>✏️ Edit</button>
+                      <button 
+                        onClick={() => deleteSource(source.id)} 
+                        className="danger"
+                        disabled={deletingSource === source.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        {deletingSource === source.id ? (
+                          <>
+                            <LoadingSpinner size="small" inline />
+                            Deleting...
+                          </>
+                        ) : (
+                          '🗑️ Delete'
+                        )}
+                      </button>
+                    </div>
                   </div>
-                  <div className="source-actions">
-                    <button 
-                      onClick={() => toggleSource(source.id)}
-                      className={source.active ? 'active-toggle' : 'inactive-toggle'}
-                    >
-                      {source.active ? '✓ Enabled' : '○ Disabled'}
-                    </button>
-                    <button onClick={() => setEditingSource(source)}>✏️ Edit</button>
-                    <button onClick={() => deleteSource(source.id)} className="danger">
-                      🗑️ Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -547,8 +623,17 @@ function Settings() {
                     <button 
                       onClick={() => toggleJob(job.job_name)}
                       className={job.enabled ? 'disable-button' : 'enable-button'}
+                      disabled={togglingJob === job.job_name}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
-                      {job.enabled ? 'Disable' : 'Enable'}
+                      {togglingJob === job.job_name ? (
+                        <>
+                          <LoadingSpinner size="small" inline />
+                          {job.enabled ? 'Disabling...' : 'Enabling...'}
+                        </>
+                      ) : (
+                        job.enabled ? 'Disable' : 'Enable'
+                      )}
                     </button>
                   </div>
                   
@@ -570,8 +655,20 @@ function Settings() {
                     </div>
                   )}
                   
-                  <button onClick={() => triggerJob(job.job_name)} className="trigger-button">
-                    ▶️ Run Now
+                  <button 
+                    onClick={() => triggerJob(job.job_name)} 
+                    className="trigger-button"
+                    disabled={triggeringJob === job.job_name}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    {triggeringJob === job.job_name ? (
+                      <>
+                        <LoadingSpinner size="small" inline />
+                        Running...
+                      </>
+                    ) : (
+                      '▶️ Run Now'
+                    )}
                   </button>
                 </div>
               ))}
@@ -598,8 +695,17 @@ function Settings() {
                     <button 
                       onClick={() => toggleJob(job.job_name)}
                       className={job.enabled ? 'disable-button' : 'enable-button'}
+                      disabled={togglingJob === job.job_name}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
-                      {job.enabled ? 'Disable' : 'Enable'}
+                      {togglingJob === job.job_name ? (
+                        <>
+                          <LoadingSpinner size="small" inline />
+                          {job.enabled ? 'Disabling...' : 'Enabling...'}
+                        </>
+                      ) : (
+                        job.enabled ? 'Disable' : 'Enable'
+                      )}
                     </button>
                   </div>
                   
@@ -621,8 +727,20 @@ function Settings() {
                     </div>
                   )}
                   
-                  <button onClick={() => triggerJob(job.job_name)} className="trigger-button">
-                    ▶️ Run Now
+                  <button 
+                    onClick={() => triggerJob(job.job_name)} 
+                    className="trigger-button"
+                    disabled={triggeringJob === job.job_name}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    {triggeringJob === job.job_name ? (
+                      <>
+                        <LoadingSpinner size="small" inline />
+                        Running...
+                      </>
+                    ) : (
+                      '▶️ Run Now'
+                    )}
                   </button>
                 </div>
               ))}
@@ -699,7 +817,20 @@ function Settings() {
             </div>
 
             <div className="action-buttons" style={{marginTop: '2rem'}}>
-              <button onClick={clearClusters}>🗑️ Clear All Clusters</button>
+              <button 
+                onClick={clearClusters}
+                disabled={clearingClusters}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                {clearingClusters ? (
+                  <>
+                    <LoadingSpinner size="small" inline />
+                    Clearing...
+                  </>
+                ) : (
+                  '🗑️ Clear All Clusters'
+                )}
+              </button>
             </div>
           </div>
         )}
@@ -761,8 +892,16 @@ function Settings() {
                           onClick={() => fetchModelsForAdapter(adapter.name)}
                           disabled={loadingModels[adapter.name]}
                           className="refresh-models-btn"
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                         >
-                          {loadingModels[adapter.name] ? 'Loading...' : 'Refresh'}
+                          {loadingModels[adapter.name] ? (
+                            <>
+                              <LoadingSpinner size="small" inline />
+                              Loading...
+                            </>
+                          ) : (
+                            'Refresh'
+                          )}
                         </button>
                       </div>
                     </div>
@@ -772,21 +911,43 @@ function Settings() {
                     <button 
                       onClick={() => testAdapter(adapter.name)}
                       disabled={!adapter.available || testingAdapter === adapter.name}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
-                      {testingAdapter === adapter.name ? 'Testing...' : 'Test'}
+                      {testingAdapter === adapter.name ? (
+                        <>
+                          <LoadingSpinner size="small" inline />
+                          Testing...
+                        </>
+                      ) : (
+                        'Test'
+                      )}
                     </button>
                     {!adapter.active && adapter.available && (
-                      <button onClick={async () => {
-                        try {
-                          await newsAPI.updateSettings({ llm_adapter: adapter.name });
-                          await loadSettings();
-                          await loadAdditionalData();
-                          showMessage(`${adapter.name} is now the active adapter`, 'success');
-                        } catch (err) {
-                          showMessage(`Failed to set ${adapter.name} as active`, 'error');
-                        }
-                      }}>
-                        Set Active
+                      <button 
+                        onClick={async () => {
+                          try {
+                            setSettingActiveAdapter(adapter.name);
+                            await newsAPI.updateSettings({ llm_adapter: adapter.name });
+                            await loadSettings();
+                            await loadAdditionalData();
+                            showMessage(`${adapter.name} is now the active adapter`, 'success');
+                          } catch (err) {
+                            showMessage(`Failed to set ${adapter.name} as active`, 'error');
+                          } finally {
+                            setSettingActiveAdapter(null);
+                          }
+                        }}
+                        disabled={settingActiveAdapter === adapter.name}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        {settingActiveAdapter === adapter.name ? (
+                          <>
+                            <LoadingSpinner size="small" inline />
+                            Setting Active...
+                          </>
+                        ) : (
+                          'Set Active'
+                        )}
                       </button>
                     )}
                   </div>
@@ -834,7 +995,9 @@ function Settings() {
               Monitor database size, manage storage, and perform maintenance tasks.
             </p>
             
-            {dataStats && (
+            {loadingDataStats ? (
+              <LoadingSpinner text="Loading database statistics..." />
+            ) : dataStats && (
               <div className="data-stats">
                 <h3>Database Statistics</h3>
                 <div className="stats-grid">
@@ -917,7 +1080,21 @@ function Settings() {
                       />
                       days
                     </label>
-                    <button onClick={cleanupData} className="button">Clean Articles</button>
+                    <button 
+                      onClick={cleanupData} 
+                      className="button"
+                      disabled={cleaningData}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                      {cleaningData ? (
+                        <>
+                          <LoadingSpinner size="small" inline />
+                          Cleaning...
+                        </>
+                      ) : (
+                        'Clean Articles'
+                      )}
+                    </button>
                   </div>
                   <small style={{color: '#666'}}>Tip: Use 0 to delete ALL articles</small>
                 </div>
@@ -925,15 +1102,67 @@ function Settings() {
 
               <div className="maintenance-section">
                 <h4>Cache Management</h4>
-                <button onClick={clearCache}>🗑️ Clear LLM Cache</button>
+                <button 
+                  onClick={clearCache}
+                  disabled={clearingCache}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  {clearingCache ? (
+                    <>
+                      <LoadingSpinner size="small" inline />
+                      Clearing...
+                    </>
+                  ) : (
+                    '🗑️ Clear LLM Cache'
+                  )}
+                </button>
               </div>
 
               <div className="maintenance-section">
                 <h4>Backup & Export</h4>
                 <div className="action-buttons">
-                  <button onClick={() => exportData('all')}>📦 Export All Data</button>
-                  <button onClick={() => exportData('settings')}>⚙️ Export Settings</button>
-                  <button onClick={() => exportData('sources')}>📰 Export Sources</button>
+                  <button 
+                    onClick={() => exportData('all')}
+                    disabled={exportingData === 'all'}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    {exportingData === 'all' ? (
+                      <>
+                        <LoadingSpinner size="small" inline />
+                        Exporting...
+                      </>
+                    ) : (
+                      '📦 Export All Data'
+                    )}
+                  </button>
+                  <button 
+                    onClick={() => exportData('settings')}
+                    disabled={exportingData === 'settings'}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    {exportingData === 'settings' ? (
+                      <>
+                        <LoadingSpinner size="small" inline />
+                        Exporting...
+                      </>
+                    ) : (
+                      '⚙️ Export Settings'
+                    )}
+                  </button>
+                  <button 
+                    onClick={() => exportData('sources')}
+                    disabled={exportingData === 'sources'}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    {exportingData === 'sources' ? (
+                      <>
+                        <LoadingSpinner size="small" inline />
+                        Exporting...
+                      </>
+                    ) : (
+                      '📰 Export Sources'
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
@@ -962,8 +1191,17 @@ function Settings() {
                     <button 
                       onClick={() => toggleJob(job.job_name)}
                       className={job.enabled ? 'disable-button' : 'enable-button'}
+                      disabled={togglingJob === job.job_name}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
-                      {job.enabled ? 'Disable' : 'Enable'}
+                      {togglingJob === job.job_name ? (
+                        <>
+                          <LoadingSpinner size="small" inline />
+                          {job.enabled ? 'Disabling...' : 'Enabling...'}
+                        </>
+                      ) : (
+                        job.enabled ? 'Disable' : 'Enable'
+                      )}
                     </button>
                   </div>
                   
@@ -1082,7 +1320,7 @@ function Settings() {
 }
 
 // Source Form Component
-function SourceForm({ source, onSave, onCancel }) {
+function SourceForm({ source, onSave, onCancel, savingSource }) {
   const [formData, setFormData] = useState({
     name: source.name || '',
     url: source.url || '',
@@ -1204,7 +1442,20 @@ function SourceForm({ source, onSave, onCancel }) {
       </div>
 
       <div className="form-actions">
-        <button type="submit">Save</button>
+        <button 
+          type="submit"
+          disabled={savingSource}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          {savingSource ? (
+            <>
+              <LoadingSpinner size="small" inline />
+              Saving...
+            </>
+          ) : (
+            'Save'
+          )}
+        </button>
         <button type="button" onClick={onCancel} className="secondary">Cancel</button>
       </div>
     </form>
