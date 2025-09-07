@@ -76,6 +76,7 @@ INSERT OR IGNORE INTO settings (key, value, type, category, description, default
   ('max_articles_per_source', '1000', 'number', 'data', 'Maximum articles per source', '1000'),
   ('auto_cleanup_enabled', 'false', 'boolean', 'data', 'Enable automatic cleanup', 'false'),
   ('database_backup_enabled', 'false', 'boolean', 'data', 'Enable automatic backups', 'false'),
+  ('backup_location', './backups', 'string', 'data', 'Backup directory location', './backups'),
   
   -- Content Settings
   ('content_mode', 'safe', 'string', 'content', 'Content mode (safe/research)', 'safe'),
@@ -91,7 +92,9 @@ INSERT OR IGNORE INTO settings (key, value, type, category, description, default
 -- Default scheduled jobs
 INSERT OR IGNORE INTO scheduled_jobs (job_name, enabled, cron_expression, status) VALUES 
   ('ingestion', 1, '*/15 * * * *', 'idle'),
-  ('clustering', 1, '*/30 * * * *', 'idle');
+  ('clustering', 1, '*/30 * * * *', 'idle'),
+  ('backup', 0, '0 2 * * *', 'idle'),
+  ('cleanup', 0, '0 3 * * *', 'idle');
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_settings_category ON settings(category);

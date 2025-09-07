@@ -35,7 +35,6 @@ function Settings() {
   
   // Data stats
   const [dataStats, setDataStats] = useState(null);
-  const [cleaningData, setCleaningData] = useState(false);
   const [clearingClusters, setClearingClusters] = useState(false);
   const [clearingCache, setClearingCache] = useState(false);
   const [exportingData, setExportingData] = useState(null);
@@ -43,7 +42,6 @@ function Settings() {
   
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState(null);
-  const [cleanupDays, setCleanupDays] = useState(30);
 
   useEffect(() => {
     loadAllData();
@@ -323,31 +321,6 @@ function Settings() {
   }
 
   // Data management functions
-  async function cleanupData() {
-    const days = parseInt(cleanupDays);
-    setConfirmAction({
-      title: days === 0 ? 'Delete ALL Articles' : 'Clean Old Articles',
-      message: days === 0 
-        ? 'Are you sure you want to delete ALL articles? This cannot be undone.'
-        : `Are you sure you want to delete articles older than ${days} days?`,
-      onConfirm: async () => {
-        try {
-          setCleaningData(true);
-          await newsAPI.cleanupOldArticles(days);
-          const stats = await newsAPI.getDataStats();
-          setDataStats(stats);
-          showMessage(days === 0 ? 'All articles deleted' : `Old articles cleaned (${days} days)`, 'success');
-        } catch (err) {
-          showMessage('Failed to cleanup articles', 'error');
-        } finally {
-          setCleaningData(false);
-        }
-        setConfirmAction(null);
-      },
-      onCancel: () => setConfirmAction(null)
-    });
-  }
-
   async function clearClusters() {
     setConfirmAction({
       title: 'Clear All Clusters',
@@ -870,13 +843,14 @@ function Settings() {
                   
                   {/* Model selector for available adapters */}
                   {adapter.available && (
-                    <div className="adapter-model">
-                      <div className="model-selector-group">
-                        <label>Model:</label>
+                    <div className="adapter-model" style={{ marginTop: '1rem' }}>
+                      <div className="model-selector-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <label style={{ fontWeight: '500' }}>Model:</label>
                         <select 
                           value={adapter.currentModel || ''}
                           onChange={(e) => updateAdapterModel(adapter.name, e.target.value)}
                           disabled={loadingModels[adapter.name]}
+                          style={{ width: '100%', padding: '0.5rem' }}
                         >
                           <option value="">Select a model...</option>
                           {(adapterModels[adapter.name] || []).map(model => (
@@ -888,8 +862,8 @@ function Settings() {
                         <button 
                           onClick={() => fetchModelsForAdapter(adapter.name)}
                           disabled={loadingModels[adapter.name]}
-                          className="refresh-models-btn"
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                          className="button"
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%' }}
                         >
                           {loadingModels[adapter.name] ? (
                             <>
@@ -904,11 +878,21 @@ function Settings() {
                     </div>
                   )}
                   
-                  <div className="adapter-actions">
+                  <div className="adapter-actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
                     <button 
                       onClick={() => testAdapter(adapter.name)}
                       disabled={!adapter.available || testingAdapter === adapter.name}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                      className="button"
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '0.5rem', 
+                        width: '100%',
+                        backgroundColor: '#4b5563',
+                        color: 'white',
+                        border: 'none'
+                      }}
                     >
                       {testingAdapter === adapter.name ? (
                         <>
@@ -925,9 +909,9 @@ function Settings() {
                           try {
                             setSettingActiveAdapter(adapter.name);
                             await newsAPI.updateSettings({ llm_adapter: adapter.name });
-                            await loadSettings();
-                            await loadAdditionalData();
                             showMessage(`${adapter.name} is now the active adapter`, 'success');
+                            // Reload all data to refresh adapter statuses
+                            await loadAllData();
                           } catch (err) {
                             showMessage(`Failed to set ${adapter.name} as active`, 'error');
                           } finally {
@@ -935,7 +919,17 @@ function Settings() {
                           }
                         }}
                         disabled={settingActiveAdapter === adapter.name}
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        className="button primary"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          gap: '0.5rem', 
+                          width: '100%',
+                          backgroundColor: '#3b82f6',
+                          color: 'white',
+                          border: 'none'
+                        }}
                       >
                         {settingActiveAdapter === adapter.name ? (
                           <>
@@ -1058,43 +1052,8 @@ function Settings() {
             </div>
 
             <div className="data-actions">
-              <h3>Maintenance</h3>
+              <h3>Manual Maintenance</h3>
               
-              <div className="maintenance-section">
-                <h4>Article Cleanup</h4>
-                <div className="cleanup-controls">
-                  <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem'}}>
-                    <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                      Delete articles older than
-                      <input 
-                        type="number" 
-                        value={cleanupDays}
-                        onChange={(e) => setCleanupDays(e.target.value)}
-                        style={{width: '80px', padding: '0.25rem'}}
-                        min="0"
-                      />
-                      days
-                    </label>
-                    <button 
-                      onClick={cleanupData} 
-                      className="button"
-                      disabled={cleaningData}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                    >
-                      {cleaningData ? (
-                        <>
-                          <LoadingSpinner size="small" inline />
-                          Cleaning...
-                        </>
-                      ) : (
-                        'Clean Articles'
-                      )}
-                    </button>
-                  </div>
-                  <small style={{color: '#666'}}>Tip: Use 0 to delete ALL articles</small>
-                </div>
-              </div>
-
               <div className="maintenance-section">
                 <h4>Cache Management</h4>
                 <button 
@@ -1211,6 +1170,70 @@ function Settings() {
                       />
                     </label>
                   </div>
+                  
+                  {job.last_run && (
+                    <div className="job-info">
+                      <small>Last run: {new Date(job.last_run).toLocaleString()}</small>
+                    </div>
+                  )}
+                  
+                  <button 
+                    onClick={() => triggerJob(job.job_name)} 
+                    className="trigger-button"
+                    disabled={triggeringJob === job.job_name}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}
+                  >
+                    {triggeringJob === job.job_name ? (
+                      <>
+                        <LoadingSpinner size="small" inline />
+                        Running...
+                      </>
+                    ) : (
+                      '▶️ Run Now'
+                    )}
+                  </button>
+                  
+                  {/* Job-specific configuration */}
+                  {job.job_name === 'backup' && (
+                    <div className="job-specific-config" style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb'}}>
+                      <div className="setting-item">
+                        <label>
+                          <span className="setting-label">Backup Location</span>
+                          <input 
+                            type="text"
+                            placeholder="./backups"
+                            value={settings.data?.find(s => s.key === 'backup_location')?.value || './backups'}
+                            onChange={(e) => updateSetting('data', 'backup_location', e.target.value)}
+                            style={{width: '100%'}}
+                          />
+                          <small style={{color: '#666', display: 'block', marginTop: '0.5rem'}}>
+                            Directory where backup files will be saved (relative or absolute path)
+                          </small>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {job.job_name === 'cleanup' && (
+                    <div className="job-specific-config" style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb'}}>
+                      <div className="setting-item">
+                        <label>
+                          <span className="setting-label">Article Retention Days</span>
+                          <input 
+                            type="number"
+                            min="1"
+                            max="365"
+                            value={settings.data?.find(s => s.key === 'article_retention_days')?.value || 30}
+                            onChange={(e) => updateSetting('data', 'article_retention_days', parseInt(e.target.value))}
+                            style={{width: '100px'}}
+                          />
+                          <small style={{color: '#666', display: 'block', marginTop: '0.5rem'}}>
+                            Articles older than this many days will be automatically deleted
+                          </small>
+                        </label>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
