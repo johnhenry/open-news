@@ -38,6 +38,7 @@ function Settings() {
   const [clearingClusters, setClearingClusters] = useState(false);
   const [clearingCache, setClearingCache] = useState(false);
   const [exportingData, setExportingData] = useState(null);
+  const [importingData, setImportingData] = useState(null);
   const [triggeringClustering, setTriggeringClustering] = useState(false);
   
   // Confirmation dialog state
@@ -312,6 +313,12 @@ function Settings() {
       } else if (jobName === 'clustering') {
         await newsAPI.triggerClustering();
         showMessage('Clustering started', 'success');
+      } else if (jobName === 'backup') {
+        const result = await newsAPI.triggerBackup();
+        showMessage(`Backup completed: ${result.articles} articles backed up`, 'success');
+      } else if (jobName === 'cleanup') {
+        const result = await newsAPI.triggerCleanup();
+        showMessage(`Cleanup completed: ${result.articlesDeleted} articles deleted`, 'success');
       }
     } catch (err) {
       showMessage(`Failed to trigger ${jobName}`, 'error');
@@ -383,6 +390,57 @@ function Settings() {
       showMessage(`Failed to export ${type}`, 'error');
     } finally {
       setExportingData(null);
+    }
+  }
+
+  async function importData(type) {
+    try {
+      // Create file input element
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        try {
+          setImportingData(type);
+          const text = await file.text();
+          const data = JSON.parse(text);
+          
+          // Show confirmation dialog
+          setConfirmAction({
+            title: `Import ${type === 'all' ? 'All Data' : type === 'settings' ? 'Settings' : 'Sources'}`,
+            message: `Are you sure you want to import ${type} data? This will replace existing data.`,
+            onConfirm: async () => {
+              try {
+                const result = await newsAPI.importData(type, data, false);
+                showMessage(`Successfully imported ${result.imported.sources || 0} sources, ${result.imported.settings || 0} settings, ${result.imported.articles || 0} articles`, 'success');
+                // Reload data to reflect changes
+                await loadAllData();
+              } catch (err) {
+                showMessage(`Failed to import: ${err.message}`, 'error');
+              } finally {
+                setImportingData(null);
+                setConfirmAction(null);
+              }
+            },
+            onCancel: () => {
+              setImportingData(null);
+              setConfirmAction(null);
+            }
+          });
+        } catch (err) {
+          showMessage(`Failed to read file: ${err.message}`, 'error');
+          setImportingData(null);
+        }
+      };
+      
+      input.click();
+    } catch (err) {
+      showMessage(`Failed to import ${type}`, 'error');
+      setImportingData(null);
     }
   }
 
@@ -1119,6 +1177,54 @@ function Settings() {
                   </button>
                 </div>
               </div>
+
+              <div className="maintenance-section">
+                <h4>Restore & Import</h4>
+                <div className="action-buttons">
+                  <button 
+                    onClick={() => importData('all')}
+                    disabled={importingData === 'all'}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    {importingData === 'all' ? (
+                      <>
+                        <LoadingSpinner size="small" inline />
+                        Importing...
+                      </>
+                    ) : (
+                      '📥 Import All Data'
+                    )}
+                  </button>
+                  <button 
+                    onClick={() => importData('settings')}
+                    disabled={importingData === 'settings'}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    {importingData === 'settings' ? (
+                      <>
+                        <LoadingSpinner size="small" inline />
+                        Importing...
+                      </>
+                    ) : (
+                      '⚙️ Import Settings'
+                    )}
+                  </button>
+                  <button 
+                    onClick={() => importData('sources')}
+                    disabled={importingData === 'sources'}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    {importingData === 'sources' ? (
+                      <>
+                        <LoadingSpinner size="small" inline />
+                        Importing...
+                      </>
+                    ) : (
+                      '📰 Import Sources'
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="settings-group">
@@ -1221,14 +1327,14 @@ function Settings() {
                           <span className="setting-label">Article Retention Days</span>
                           <input 
                             type="number"
-                            min="1"
+                            min="-1"
                             max="365"
                             value={settings.data?.find(s => s.key === 'article_retention_days')?.value || 30}
                             onChange={(e) => updateSetting('data', 'article_retention_days', parseInt(e.target.value))}
                             style={{width: '100px'}}
                           />
                           <small style={{color: '#666', display: 'block', marginTop: '0.5rem'}}>
-                            Articles older than this many days will be automatically deleted
+                            Articles older than this many days will be automatically deleted. Use -1 to delete all articles.
                           </small>
                         </label>
                       </div>

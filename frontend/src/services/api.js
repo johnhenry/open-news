@@ -150,6 +150,16 @@ export const newsAPI = {
     return response.data;
   },
 
+  async triggerBackup() {
+    const response = await api.post('/settings/trigger-backup');
+    return response.data;
+  },
+
+  async triggerCleanup() {
+    const response = await api.post('/settings/trigger-cleanup');
+    return response.data;
+  },
+
   async clearClusters() {
     const response = await api.post('/settings/data/clear-clusters');
     return response.data;
@@ -157,6 +167,11 @@ export const newsAPI = {
 
   async exportData(type) {
     const response = await api.get('/settings/data/export', { params: { type } });
+    return response.data;
+  },
+
+  async importData(type, data, merge = false) {
+    const response = await api.post('/settings/data/import', { type, data, merge });
     return response.data;
   }
 };

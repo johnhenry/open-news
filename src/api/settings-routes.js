@@ -1,7 +1,7 @@
 import { Settings, ScheduledJobs, LLMCache } from '../db/settings-model.js';
 import { Source } from '../db/models.js';
 import { getLLMManager } from '../llm/manager.js';
-import { scheduleIngestion, scheduleClustering } from '../jobs/scheduler.js';
+import { scheduleIngestion, scheduleClustering, scheduleBackup, scheduleCleanup } from '../jobs/scheduler.js';
 import { getDb } from '../db/index.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -333,6 +333,16 @@ export async function registerSettingsRoutes(fastify) {
         await scheduleClustering(enabled ? job.cron_expression : null);
       }
       
+      if (name === 'backup' && ('enabled' in updates || 'cron_expression' in updates)) {
+        const enabled = job.enabled;
+        await scheduleBackup(enabled ? job.cron_expression : null);
+      }
+      
+      if (name === 'cleanup' && ('enabled' in updates || 'cron_expression' in updates)) {
+        const enabled = job.enabled;
+        await scheduleCleanup(enabled ? job.cron_expression : null);
+      }
+      
       return { success: true, job };
     } catch (error) {
       reply.code(400).send({ error: error.message });
@@ -377,6 +387,28 @@ export async function registerSettingsRoutes(fastify) {
     }
   });
 
+  // Trigger manual backup
+  fastify.post('/api/settings/trigger-backup', async (request, reply) => {
+    try {
+      const { runBackup } = await import('../jobs/backup.js');
+      const result = await runBackup();
+      return { success: true, ...result };
+    } catch (error) {
+      reply.code(500).send({ error: error.message });
+    }
+  });
+
+  // Trigger manual cleanup
+  fastify.post('/api/settings/trigger-cleanup', async (request, reply) => {
+    try {
+      const { runCleanup } = await import('../jobs/cleanup.js');
+      const result = await runCleanup();
+      return { success: true, ...result };
+    } catch (error) {
+      reply.code(500).send({ error: error.message });
+    }
+  });
+
   // Clear all clusters
   fastify.post('/api/settings/data/clear-clusters', async (request, reply) => {
     const db = getDb();
@@ -398,8 +430,8 @@ export async function registerSettingsRoutes(fastify) {
     const { days = 30 } = request.body;
     const db = getDb();
     
-    // Special case: 0 days means delete ALL articles
-    const cutoff = days === 0 
+    // Special case: -1 or 0 days means delete ALL articles
+    const cutoff = (days === -1 || days === 0)
       ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Tomorrow's date to catch everything
       : new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
     
@@ -465,12 +497,134 @@ export async function registerSettingsRoutes(fastify) {
     }
     
     if (type === 'articles' || type === 'all') {
-      data.articles = db.prepare('SELECT * FROM articles ORDER BY published_at DESC LIMIT 1000').all();
+      data.articles = db.prepare('SELECT * FROM articles ORDER BY published_at DESC').all();
+      data.clusters = db.prepare('SELECT * FROM clusters').all();
+      data.article_clusters = db.prepare('SELECT * FROM article_clusters').all();
     }
     
     reply.header('Content-Type', 'application/json');
-    reply.header('Content-Disposition', `attachment; filename="open-news-export-${Date.now()}.json"`);
+    reply.header('Content-Disposition', `attachment; filename="open-news-export-${type}-${Date.now()}.json"`);
     return data;
+  });
+
+  // Import data - handles file upload and data restoration
+  fastify.post('/api/settings/data/import', async (request, reply) => {
+    const { type, data, merge = false } = request.body;
+    const db = getDb();
+    
+    try {
+      db.prepare('BEGIN TRANSACTION').run();
+      
+      let imported = {};
+      
+      // Import sources
+      if (data.sources && (type === 'sources' || type === 'all')) {
+        if (!merge) {
+          db.prepare('DELETE FROM sources').run();
+        }
+        
+        const insertSource = db.prepare(`
+          INSERT OR REPLACE INTO sources (
+            name, url, rss_url, api_url, bias, bias_score, 
+            scraping_enabled, active, notes
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        for (const source of data.sources) {
+          insertSource.run(
+            source.name, source.url, source.rss_url, source.api_url,
+            source.bias, source.bias_score, source.scraping_enabled, source.active,
+            source.notes
+          );
+        }
+        imported.sources = data.sources.length;
+      }
+      
+      // Import settings
+      if (data.settings && (type === 'settings' || type === 'all')) {
+        let count = 0;
+        for (const category in data.settings) {
+          for (const setting of data.settings[category]) {
+            Settings.set(setting.key, setting.value);
+            count++;
+          }
+        }
+        imported.settings = count;
+      }
+      
+      // Import articles and related data
+      if (data.articles && (type === 'all')) {
+        if (!merge) {
+          // Clear existing data
+          db.prepare('DELETE FROM article_clusters').run();
+          db.prepare('DELETE FROM articles').run();
+          db.prepare('DELETE FROM clusters').run();
+        }
+        
+        // Import articles
+        const insertArticle = db.prepare(`
+          INSERT OR IGNORE INTO articles (
+            source_id, title, url, author, published_at, excerpt, 
+            content, image_url, bias, bias_score, sentiment_score
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        for (const article of data.articles) {
+          insertArticle.run(
+            article.source_id, article.title, article.url,
+            article.author, article.published_at, article.excerpt,
+            article.content, article.image_url, article.bias,
+            article.bias_score, article.sentiment_score
+          );
+        }
+        imported.articles = data.articles.length;
+        
+        // Import clusters if present
+        if (data.clusters) {
+          const insertCluster = db.prepare(`
+            INSERT OR REPLACE INTO clusters (
+              title, summary, fact_core, confidence_score
+            ) VALUES (?, ?, ?, ?)
+          `);
+          
+          for (const cluster of data.clusters) {
+            insertCluster.run(
+              cluster.title, cluster.summary, cluster.fact_core,
+              cluster.confidence_score
+            );
+          }
+          imported.clusters = data.clusters.length;
+        }
+        
+        // Import article_clusters if present
+        if (data.article_clusters) {
+          const insertMapping = db.prepare(`
+            INSERT OR IGNORE INTO article_clusters (
+              article_id, cluster_id, similarity_score
+            ) VALUES (?, ?, ?)
+          `);
+          
+          for (const mapping of data.article_clusters) {
+            insertMapping.run(
+              mapping.article_id, mapping.cluster_id,
+              mapping.similarity_score
+            );
+          }
+          imported.article_clusters = data.article_clusters.length;
+        }
+      }
+      
+      db.prepare('COMMIT').run();
+      
+      return {
+        success: true,
+        message: `Successfully imported data`,
+        imported
+      };
+    } catch (error) {
+      db.prepare('ROLLBACK').run();
+      reply.code(500).send({ error: error.message });
+    }
   });
 }
 

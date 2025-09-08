@@ -1,0 +1,218 @@
+[
+  {
+    "key": "llm_enabled",
+    "value": "true",
+    "type": "boolean",
+    "category": "llm",
+    "description": "Enable LLM features",
+    "default_value": "true",
+    "updated_at": "2025-09-06 22:06:56"
+  },
+  {
+    "key": "llm_adapter",
+    "value": "lmstudio",
+    "type": "string",
+    "category": "llm",
+    "description": "Active LLM adapter",
+    "default_value": "ollama",
+    "updated_at": "2025-09-07 15:28:43"
+  },
+  {
+    "key": "llm_auto_analyze",
+    "value": "false",
+    "type": "boolean",
+    "category": "llm",
+    "description": "Automatically analyze new articles",
+    "default_value": "false",
+    "updated_at": "2025-09-07 15:19:28"
+  },
+  {
+    "key": "llm_confidence_threshold",
+    "value": "0.3",
+    "type": "number",
+    "category": "llm",
+    "description": "Minimum confidence for LLM results",
+    "default_value": "0.7",
+    "updated_at": "2025-09-06 22:06:56"
+  },
+  {
+    "key": "llm_cache_ttl",
+    "value": "43200",
+    "type": "number",
+    "category": "llm",
+    "description": "Cache TTL in seconds",
+    "default_value": "86400",
+    "updated_at": "2025-09-06 22:06:56"
+  },
+  {
+    "key": "ingestion_enabled",
+    "value": "false",
+    "type": "boolean",
+    "category": "ingestion",
+    "description": "Enable automatic ingestion",
+    "default_value": "true",
+    "updated_at": "2025-09-06 20:52:47"
+  },
+  {
+    "key": "ingestion_interval",
+    "value": "*/15 * * * *",
+    "type": "string",
+    "category": "ingestion",
+    "description": "Cron expression for ingestion",
+    "default_value": "*/15 * * * *",
+    "updated_at": "2025-09-06 20:52:47"
+  },
+  {
+    "key": "clustering_enabled",
+    "value": "false",
+    "type": "boolean",
+    "category": "ingestion",
+    "description": "Enable automatic clustering",
+    "default_value": "true",
+    "updated_at": "2025-09-06 20:53:34"
+  },
+  {
+    "key": "clustering_interval",
+    "value": "*/30 * * * *",
+    "type": "string",
+    "category": "ingestion",
+    "description": "Cron expression for clustering",
+    "default_value": "*/30 * * * *",
+    "updated_at": "2025-09-06 20:52:47"
+  },
+  {
+    "key": "min_cluster_size",
+    "value": "2",
+    "type": "number",
+    "category": "ingestion",
+    "description": "Minimum articles for cluster",
+    "default_value": "2",
+    "updated_at": "2025-09-07 02:12:06"
+  },
+  {
+    "key": "similarity_threshold",
+    "value": "0.2",
+    "type": "number",
+    "category": "ingestion",
+    "description": "Similarity threshold for clustering",
+    "default_value": "0.7",
+    "updated_at": "2025-09-06 23:00:33"
+  },
+  {
+    "key": "article_retention_days",
+    "value": "-1",
+    "type": "number",
+    "category": "data",
+    "description": "Days to keep articles",
+    "default_value": "30",
+    "updated_at": "2025-09-07 15:53:17"
+  },
+  {
+    "key": "max_articles_per_source",
+    "value": "1000",
+    "type": "number",
+    "category": "data",
+    "description": "Maximum articles per source",
+    "default_value": "1000",
+    "updated_at": "2025-09-06 20:58:32"
+  },
+  {
+    "key": "auto_cleanup_enabled",
+    "value": "true",
+    "type": "boolean",
+    "category": "data",
+    "description": "Enable automatic cleanup",
+    "default_value": "false",
+    "updated_at": "2025-09-06 20:58:32"
+  },
+  {
+    "key": "database_backup_enabled",
+    "value": "false",
+    "type": "boolean",
+    "category": "data",
+    "description": "Enable automatic backups",
+    "default_value": "false",
+    "updated_at": "2025-09-06 20:58:32"
+  },
+  {
+    "key": "content_mode",
+    "value": "research",
+    "type": "string",
+    "category": "content",
+    "description": "Content mode (safe/research)",
+    "default_value": "safe",
+    "updated_at": "2025-09-06 22:05:42"
+  },
+  {
+    "key": "content_filter_enabled",
+    "value": "true",
+    "type": "boolean",
+    "category": "content",
+    "description": "Enable content filtering",
+    "default_value": "true",
+    "updated_at": "2025-09-06 22:28:20"
+  },
+  {
+    "key": "max_article_length",
+    "value": "20000",
+    "type": "number",
+    "category": "content",
+    "description": "Maximum article length",
+    "default_value": "10000",
+    "updated_at": "2025-09-06 22:05:42"
+  },
+  {
+    "key": "articles_per_page",
+    "value": "25",
+    "type": "number",
+    "category": "display",
+    "description": "Articles per page",
+    "default_value": "20",
+    "updated_at": "2025-09-06 20:54:35"
+  },
+  {
+    "key": "default_bias_view",
+    "value": "center",
+    "type": "string",
+    "category": "display",
+    "description": "Default bias filter",
+    "default_value": "all",
+    "updated_at": "2025-09-06 20:54:35"
+  },
+  {
+    "key": "show_confidence_scores",
+    "value": "true",
+    "type": "boolean",
+    "category": "display",
+    "description": "Show LLM confidence scores",
+    "default_value": "true",
+    "updated_at": "2025-09-06 20:54:35"
+  },
+  {
+    "key": "date_format",
+    "value": "absolute",
+    "type": "string",
+    "category": "display",
+    "description": "Date format (relative/absolute)",
+    "default_value": "relative",
+    "updated_at": "2025-09-06 20:54:35"
+  },
+  {
+    "key": "analysis_method",
+    "value": "llm",
+    "type": "string",
+    "category": "llm",
+    "description": "Article analysis method (source_default, keyword, llm)",
+    "default_value": "source_default",
+    "updated_at": "2025-09-06 22:06:56"
+  },
+  {
+    "key": "backup_location",
+    "value": "./backups",
+    "type": "string",
+    "category": "data",
+    "description": "Backup directory location",
+    "default_value": "./backups",
+    "updated_at": "2025-09-07 16:02:59"
+  }
+]

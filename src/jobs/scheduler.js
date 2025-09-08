@@ -1,10 +1,14 @@
 import cron from 'node-cron';
 import { runIngestion } from '../ingestion/index.js';
 import runClustering from '../jobs/cluster.js';
+import { runBackup } from '../jobs/backup.js';
+import { runCleanup } from '../jobs/cleanup.js';
 import { ScheduledJobs, Settings } from '../db/settings-model.js';
 
 let ingestionJob = null;
 let clusteringJob = null;
+let backupJob = null;
+let cleanupJob = null;
 
 export async function initializeScheduler() {
   console.log('📅 Initializing scheduler...');
@@ -21,6 +25,16 @@ export async function initializeScheduler() {
   const clusteringJob = ScheduledJobs.get('clustering');
   if (clusteringJob && clusteringJob.enabled) {
     await scheduleClustering(clusteringJob.cron_expression);
+  }
+  
+  const backupJobConfig = ScheduledJobs.get('backup');
+  if (backupJobConfig && backupJobConfig.enabled) {
+    await scheduleBackup(backupJobConfig.cron_expression);
+  }
+  
+  const cleanupJobConfig = ScheduledJobs.get('cleanup');
+  if (cleanupJobConfig && cleanupJobConfig.enabled) {
+    await scheduleCleanup(cleanupJobConfig.cron_expression);
   }
 }
 
@@ -155,6 +169,112 @@ function getNextRun(cronExpression) {
   return now.toISOString();
 }
 
+export async function scheduleBackup(cronExpression = null) {
+  // Stop existing job
+  if (backupJob) {
+    backupJob.stop();
+    backupJob = null;
+    console.log('⏹️  Stopped backup job');
+  }
+  
+  // Start new job if expression provided
+  if (cronExpression && cron.validate(cronExpression)) {
+    backupJob = cron.schedule(cronExpression, async () => {
+      console.log('💾 Running scheduled backup...');
+      
+      try {
+        ScheduledJobs.update('backup', {
+          status: 'running',
+          last_run: new Date().toISOString()
+        });
+        
+        const result = await runBackup();
+        
+        ScheduledJobs.update('backup', {
+          status: 'success',
+          next_run: getNextRun(cronExpression),
+          config: JSON.stringify({
+            location: result.location,
+            articles: result.articles,
+            sources: result.sources
+          })
+        });
+        
+        console.log(`✅ Backup completed: ${result.location}`);
+      } catch (error) {
+        console.error('❌ Backup failed:', error);
+        
+        ScheduledJobs.update('backup', {
+          status: 'error',
+          config: JSON.stringify({ error: error.message })
+        });
+      }
+    });
+    
+    backupJob.start();
+    console.log(`📅 Scheduled backup: ${cronExpression}`);
+    
+    ScheduledJobs.update('backup', {
+      enabled: 1,
+      cron_expression: cronExpression,
+      next_run: getNextRun(cronExpression)
+    });
+  }
+}
+
+export async function scheduleCleanup(cronExpression = null) {
+  // Stop existing job
+  if (cleanupJob) {
+    cleanupJob.stop();
+    cleanupJob = null;
+    console.log('⏹️  Stopped cleanup job');
+  }
+  
+  // Start new job if expression provided
+  if (cronExpression && cron.validate(cronExpression)) {
+    cleanupJob = cron.schedule(cronExpression, async () => {
+      console.log('🗑️  Running scheduled cleanup...');
+      
+      try {
+        ScheduledJobs.update('cleanup', {
+          status: 'running',
+          last_run: new Date().toISOString()
+        });
+        
+        const result = await runCleanup();
+        
+        ScheduledJobs.update('cleanup', {
+          status: 'success',
+          next_run: getNextRun(cronExpression),
+          config: JSON.stringify({
+            articles_deleted: result.articlesDeleted,
+            entities_deleted: result.entitiesDeleted,
+            retention_days: result.retentionDays
+          })
+        });
+        
+        console.log(`✅ Cleanup completed: ${result.articlesDeleted} articles deleted`);
+      } catch (error) {
+        console.error('❌ Cleanup failed:', error);
+        
+        ScheduledJobs.update('cleanup', {
+          status: 'error',
+          config: JSON.stringify({ error: error.message })
+        });
+      }
+    });
+    
+    cleanupJob.start();
+    console.log(`📅 Scheduled cleanup: ${cronExpression}`);
+    
+    ScheduledJobs.update('cleanup', {
+      enabled: 1,
+      cron_expression: cronExpression,
+      next_run: getNextRun(cronExpression)
+    });
+  }
+}
+
 // Manual trigger functions
 export async function triggerIngestion() {
   console.log('🔄 Manually triggering ingestion...');
@@ -164,6 +284,16 @@ export async function triggerIngestion() {
 export async function triggerClustering() {
   console.log('🔗 Manually triggering clustering...');
   return await runClustering();
+}
+
+export async function triggerBackup() {
+  console.log('💾 Manually triggering backup...');
+  return await runBackup();
+}
+
+export async function triggerCleanup() {
+  console.log('🗑️  Manually triggering cleanup...');
+  return await runCleanup();
 }
 
 // Get scheduler status
@@ -176,6 +306,14 @@ export function getSchedulerStatus() {
     clustering: {
       running: clusteringJob !== null,
       ...ScheduledJobs.get('clustering')
+    },
+    backup: {
+      running: backupJob !== null,
+      ...ScheduledJobs.get('backup')
+    },
+    cleanup: {
+      running: cleanupJob !== null,
+      ...ScheduledJobs.get('cleanup')
     }
   };
 }
