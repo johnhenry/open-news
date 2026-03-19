@@ -80,6 +80,12 @@
   color: #1f2937;
 }
 
+.blindspot-item__reason {
+  font-size: 12px;
+  color: #d97706;
+  margin-top: 2px;
+}
+
 .blindspot-item__meta {
   font-size: 12px;
   color: #9ca3af;

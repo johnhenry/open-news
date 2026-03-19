@@ -80,6 +80,7 @@ function Dashboard() {
   const [searchParams, setSearchParams] = useState({});
   const [newArticleCount, setNewArticleCount] = useState(0);
   const [showActivity, setShowActivity] = useState(false);
+  const [storyLimit, setStoryLimit] = useState(10);
   const prevArticleCount = useRef(null);
   const pollIntervalRef = useRef(null);
 
@@ -215,7 +216,8 @@ function Dashboard() {
     });
   }
 
-  const displayedClusters = sortClusters(filteredClusters, sortBy);
+  const sortedClusters = sortClusters(filteredClusters, sortBy);
+  const displayedClusters = sortedClusters.slice(0, storyLimit);
 
   const totalArticles = dataStats?.articles ?? stats.total_articles;
   const totalClusters = dataStats?.clusters ?? stats.total_clusters;
@@ -331,9 +333,18 @@ function Dashboard() {
       <div className="dashboard__sort-row">
         <h2 className="dashboard__section-title">
           Top Stories
-          <span className="dashboard__cluster-count">{displayedClusters.length}</span>
+          <span className="dashboard__cluster-count">{displayedClusters.length}{sortedClusters.length > storyLimit ? ` of ${sortedClusters.length}` : ''}</span>
         </h2>
         <div className="dashboard__sort-controls">
+          <select
+            value={storyLimit}
+            onChange={e => setStoryLimit(Number(e.target.value))}
+            style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px', marginRight: '8px' }}
+          >
+            {[10, 20, 50].map(n => (
+              <option key={n} value={n}>Show {n}</option>
+            ))}
+          </select>
           {SORT_OPTIONS.map(opt => (
             <button
               key={opt.key}
@@ -367,7 +378,7 @@ function Dashboard() {
       <BlindspotSection />
 
       {/* Activity Log (collapsible) */}
-      {ingestionLogs.length > 0 && (
+      {(ingestionLogs.length > 0 || clusteringJob) && (
         <div className="card">
           <div
             className="dashboard__activity-header"
@@ -382,9 +393,34 @@ function Dashboard() {
           {showActivity && (
             <>
               <p className="section-hint">
-                Latest ingestion results showing articles fetched from each source.
+                Latest ingestion and clustering results.
               </p>
-              <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {/* Clustering activity */}
+                {clusteringJob?.last_run && (
+                  <div className="dashboard__activity-row">
+                    <span className={`dashboard__status-dot dashboard__status-dot--${clusteringJob.status === 'success' ? 'success' : clusteringJob.status === 'error' ? 'error' : 'warning'}`} />
+                    <span className="dashboard__activity-time">
+                      {timeAgo(clusteringJob.last_run)}
+                    </span>
+                    <span className="dashboard__activity-text">
+                      {clusteringJob.status === 'success' ? (
+                        <>
+                          Clustering: <strong>{clusteringConfig?.clusters_created ?? '?'}</strong> clusters created
+                          {clusteringConfig?.articles_processed !== undefined && (
+                            <> from <strong>{clusteringConfig.articles_processed}</strong> articles</>
+                          )}
+                        </>
+                      ) : clusteringJob.status === 'error' ? (
+                        <>Clustering failed{clusteringConfig?.error ? `: ${clusteringConfig.error.substring(0, 80)}` : ''}</>
+                      ) : (
+                        <>Clustering: {clusteringJob.status}</>
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* Ingestion activity */}
                 {ingestionLogs.map((log, i) => (
                   <div key={log.id || i} className="dashboard__activity-row">
                     <span className={`dashboard__status-dot dashboard__status-dot--${log.status === 'success' ? 'success' : log.status === 'failure' ? 'error' : 'warning'}`} />

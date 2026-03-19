@@ -4,6 +4,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import SearchBar from '../components/SearchBar';
 import { format } from 'date-fns';
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 function Articles() {
   const [articles, setArticles] = useState([]);
   const [sources, setSources] = useState([]);
@@ -11,6 +13,9 @@ function Articles() {
   const [error, setError] = useState(null);
   const [filtering, setFiltering] = useState(false);
   const [searchParams, setSearchParams] = useState({});
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
   const abortControllerRef = useRef(null);
 
   // Load sources for filter dropdown
@@ -32,7 +37,7 @@ function Articles() {
     loadSources();
   }, []);
 
-  const loadArticles = useCallback(async (signal, params, isInitial = false) => {
+  const loadArticles = useCallback(async (signal, params, currentPage, currentPageSize, isInitial = false) => {
     try {
       if (isInitial) {
         setLoading(true);
@@ -42,7 +47,10 @@ function Articles() {
       setError(null);
 
       // Build API params
-      const apiParams = {};
+      const apiParams = {
+        limit: currentPageSize,
+        offset: currentPage * currentPageSize,
+      };
       if (params.bias) apiParams.bias = params.bias;
       if (params.q) apiParams.q = params.q;
       if (params.from) apiParams.from = params.from;
@@ -59,6 +67,7 @@ function Articles() {
       if (signal?.aborted) return;
 
       setArticles(data.articles || []);
+      setTotalCount(data.total || 0);
     } catch (err) {
       if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setError(err.message);
@@ -78,21 +87,26 @@ function Articles() {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    const isInitial = articles.length === 0;
-    loadArticles(abortController.signal, searchParams, isInitial);
+    const isInitial = articles.length === 0 && page === 0;
+    loadArticles(abortController.signal, searchParams, page, pageSize, isInitial);
 
     return () => {
       abortController.abort();
     };
-  }, [searchParams, loadArticles]);
+  }, [searchParams, page, pageSize, loadArticles]);
 
   function handleSearch(params) {
+    setPage(0);
     setSearchParams(prev => {
       const prevStr = JSON.stringify(prev);
       const nextStr = JSON.stringify(params);
       return prevStr === nextStr ? prev : params;
     });
   }
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rangeStart = totalCount === 0 ? 0 : page * pageSize + 1;
+  const rangeEnd = Math.min((page + 1) * pageSize, totalCount);
 
   if (loading) return <LoadingSpinner text="Loading articles..." />;
   if (error) return <div className="error">Error: {error}</div>;
@@ -154,6 +168,42 @@ function Articles() {
               ? 'No articles match your search criteria.'
               : 'No articles found. Run ingestion to fetch articles.'}
           </p>
+        </div>
+      )}
+
+      {totalCount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+            Showing {rangeStart}-{rangeEnd} of {totalCount}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <select
+              value={pageSize}
+              onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}
+              style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+            >
+              {PAGE_SIZE_OPTIONS.map(n => (
+                <option key={n} value={n}>{n} per page</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #d1d5db', background: page === 0 ? '#f3f4f6' : '#fff', cursor: page === 0 ? 'default' : 'pointer', fontSize: '14px' }}
+            >
+              Previous
+            </button>
+            <span style={{ fontSize: '14px', color: '#374151' }}>
+              Page {page + 1} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #d1d5db', background: page >= totalPages - 1 ? '#f3f4f6' : '#fff', cursor: page >= totalPages - 1 ? 'default' : 'pointer', fontSize: '14px' }}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

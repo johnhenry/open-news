@@ -38,20 +38,26 @@ export async function registerRoutes(fastify) {
     const safeLimit = Math.max(1, Math.min(parseInt(limit) || ARTICLES.DEFAULT_LIMIT, ARTICLES.MAX_LIMIT));
     const safeOffset = Math.max(0, parseInt(offset) || 0);
 
-    let articles = Article.getAll(safeLimit, safeOffset);
-
-    if (bias) {
-      const biasValues = bias.split(',').map(b => b.trim());
-      articles = articles.filter(a => biasValues.includes(a.source_bias));
+    // If filters are used, delegate to search which handles total counts with proper WHERE clauses
+    if (bias || source_id) {
+      const searchParams = { limit: safeLimit, offset: safeOffset };
+      if (bias) searchParams.bias = bias;
+      if (source_id) searchParams.source_id = parseInt(source_id);
+      const result = Article.search(searchParams);
+      return {
+        articles: result.articles,
+        total: result.total,
+        limit: safeLimit,
+        offset: safeOffset
+      };
     }
 
-    if (source_id) {
-      articles = articles.filter(a => a.source_id === parseInt(source_id));
-    }
+    const articles = Article.getAll(safeLimit, safeOffset);
+    const totalCount = Article.getCount();
 
     return {
       articles,
-      total: articles.length,
+      total: totalCount,
       limit: safeLimit,
       offset: safeOffset
     };
@@ -98,6 +104,7 @@ export async function registerRoutes(fastify) {
 
     // Use optimized batch query instead of N+1
     const clustersWithBias = Cluster.getAllWithBiasDistribution(safeLimit, safeOffset);
+    const totalCount = Cluster.getCount();
 
     return {
       clusters: clustersWithBias.map(cluster => ({
@@ -110,7 +117,7 @@ export async function registerRoutes(fastify) {
           right: cluster.right_count || 0
         }
       })),
-      total: clustersWithBias.length,
+      total: totalCount,
       limit: safeLimit,
       offset: safeOffset
     };
@@ -222,7 +229,21 @@ export async function registerRoutes(fastify) {
         return bScore - aScore;
       });
 
+      // Categorize into left/right/underreported for frontend tabs
+      const left = blindspots.filter(b =>
+        b.blindspot_type.includes('left_dominated') || b.blindspot_type.includes('left_leaning')
+      );
+      const right = blindspots.filter(b =>
+        b.blindspot_type.includes('right_dominated') || b.blindspot_type.includes('right_leaning')
+      );
+      const underreported = blindspots.filter(b =>
+        b.blindspot_type.includes('underreported')
+      );
+
       return {
+        left,
+        right,
+        underreported,
         blindspots,
         total: blindspots.length
       };

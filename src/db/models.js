@@ -58,6 +58,10 @@ export const Source = {
 };
 
 export const Article = {
+  getCount() {
+    return db.prepare('SELECT COUNT(*) as count FROM articles').get().count;
+  },
+
   getAll(limit = 100, offset = 0) {
     return db.prepare(`
       SELECT a.*, s.name as source_name, s.bias as source_bias
@@ -138,7 +142,7 @@ export const Article = {
    * Search articles by keyword with optional filters.
    * Uses LIKE for full-text search on title, excerpt, and content.
    */
-  search({ q, bias, source, from, to, limit = 50, offset = 0 }) {
+  search({ q, bias, source, source_id, from, to, limit = 50, offset = 0 }) {
     const conditions = [];
     const params = [];
 
@@ -155,7 +159,10 @@ export const Article = {
       params.push(...biasValues);
     }
 
-    if (source) {
+    if (source_id) {
+      conditions.push('a.source_id = ?');
+      params.push(source_id);
+    } else if (source) {
       conditions.push('s.name LIKE ?');
       params.push(`%${source}%`);
     }
@@ -251,6 +258,10 @@ export const Article = {
 };
 
 export const Cluster = {
+  getCount() {
+    return db.prepare('SELECT COUNT(*) as count FROM clusters').get().count;
+  },
+
   getAll(limit = 50, offset = 0) {
     return db.prepare(`
       SELECT c.*, COUNT(ac.article_id) as article_count

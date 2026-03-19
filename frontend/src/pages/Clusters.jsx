@@ -4,20 +4,26 @@ import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import BiasSpectrum from '../components/BiasSpectrum';
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 function Clusters() {
   const [clusters, setClusters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const loadClusters = useCallback(async (signal) => {
+  const loadClusters = useCallback(async (signal, currentPage, currentPageSize) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await newsAPI.getClusters(100, 0, { signal });
+      const data = await newsAPI.getClusters(currentPageSize, currentPage * currentPageSize, { signal });
 
       if (signal?.aborted) return;
 
       setClusters(data.clusters);
+      setTotalCount(data.total || 0);
     } catch (err) {
       if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setError(err.message);
@@ -30,12 +36,16 @@ function Clusters() {
 
   useEffect(() => {
     const abortController = new AbortController();
-    loadClusters(abortController.signal);
+    loadClusters(abortController.signal, page, pageSize);
 
     return () => {
       abortController.abort();
     };
-  }, [loadClusters]);
+  }, [loadClusters, page, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rangeStart = totalCount === 0 ? 0 : page * pageSize + 1;
+  const rangeEnd = Math.min((page + 1) * pageSize, totalCount);
 
   if (loading) return <LoadingSpinner text="Loading clusters..." />;
   if (error) return <div className="error">Error: {error}</div>;
@@ -80,6 +90,42 @@ function Clusters() {
       {clusters.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: '40px' }}>
           <p style={{ color: '#6b7280' }}>No clusters found. Run ingestion to fetch articles first.</p>
+        </div>
+      )}
+
+      {totalCount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+            Showing {rangeStart}-{rangeEnd} of {totalCount}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <select
+              value={pageSize}
+              onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}
+              style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+            >
+              {PAGE_SIZE_OPTIONS.map(n => (
+                <option key={n} value={n}>{n} per page</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #d1d5db', background: page === 0 ? '#f3f4f6' : '#fff', cursor: page === 0 ? 'default' : 'pointer', fontSize: '14px' }}
+            >
+              Previous
+            </button>
+            <span style={{ fontSize: '14px', color: '#374151' }}>
+              Page {page + 1} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #d1d5db', background: page >= totalPages - 1 ? '#f3f4f6' : '#fff', cursor: page >= totalPages - 1 ? 'default' : 'pointer', fontSize: '14px' }}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

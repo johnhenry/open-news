@@ -33,6 +33,14 @@ function BlindspotSection() {
 
   if (loading || !blindspots) return null;
 
+  const reasonLabels = {
+    left_dominated: 'Mostly left-leaning sources',
+    left_leaning: 'Skews left-leaning',
+    right_dominated: 'Mostly right-leaning sources',
+    right_leaning: 'Skews right-leaning',
+    underreported: 'Very few sources covering this',
+  };
+
   const tabs = [
     { key: 'left', label: 'Left Blindspots', color: '#1d4ed8', description: 'Stories only covered by left-leaning sources' },
     { key: 'right', label: 'Right Blindspots', color: '#dc2626', description: 'Stories only covered by right-leaning sources' },
@@ -70,16 +78,20 @@ function BlindspotSection() {
 
       {activeData.length > 0 ? (
         <div className="blindspot-list">
-          {activeData.slice(0, 5).map(cluster => (
+          {activeData.slice(0, 8).map(item => (
             <Link
-              key={cluster.id}
-              to={`/clusters/${cluster.id}`}
+              key={item.cluster_id}
+              to={`/clusters/${item.cluster_id}`}
               className="blindspot-item"
             >
-              <div className="blindspot-item__title">{cluster.title}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="blindspot-item__title">{item.title}</div>
+                <div className="blindspot-item__reason">
+                  {item.blindspot_type.map(t => reasonLabels[t] || t).join(' · ')}
+                </div>
+              </div>
               <div className="blindspot-item__meta">
-                {cluster.article_count || cluster.articles?.length || 0} articles
-                {cluster.sources && ` from ${cluster.sources.length} sources`}
+                {item.article_count} articles · {item.source_count} {item.source_count === 1 ? 'source' : 'sources'}
               </div>
             </Link>
           ))}
