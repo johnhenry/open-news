@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './SearchBar.css';
 
 const BIAS_OPTIONS = [
@@ -17,19 +17,19 @@ const DATE_OPTIONS = [
 ];
 
 function getDateRange(key) {
-  const now = new Date();
   switch (key) {
     case 'today': {
+      const now = new Date();
       const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       return { from: from.toISOString().split('T')[0] };
     }
     case 'week': {
-      const from = new Date(now);
+      const from = new Date();
       from.setDate(from.getDate() - 7);
       return { from: from.toISOString().split('T')[0] };
     }
     case 'month': {
-      const from = new Date(now);
+      const from = new Date();
       from.setMonth(from.getMonth() - 1);
       return { from: from.toISOString().split('T')[0] };
     }
@@ -38,38 +38,49 @@ function getDateRange(key) {
   }
 }
 
+function buildParams(query, biases, dateRange, source) {
+  const params = {};
+  if (query.trim()) params.q = query.trim();
+  if (biases.length > 0) params.bias = biases.join(',');
+  const range = getDateRange(dateRange);
+  if (range.from) params.from = range.from;
+  if (source) {
+    if (!isNaN(source)) {
+      params.source_id = Number(source);
+    } else {
+      params.source = source;
+    }
+  }
+  return params;
+}
+
 function SearchBar({ onSearch, sources = [], showSourceFilter = false, placeholder = 'Search stories...' }) {
   const [query, setQuery] = useState('');
   const [selectedBiases, setSelectedBiases] = useState([]);
   const [dateRange, setDateRange] = useState('all');
   const [selectedSource, setSelectedSource] = useState('');
   const debounceRef = useRef(null);
+  // Store onSearch in a ref so it's always current without being a dependency
+  const onSearchRef = useRef(onSearch);
+  onSearchRef.current = onSearch;
+  // Track whether initial mount has happened
+  const mountedRef = useRef(false);
 
-  const emitSearch = useCallback((q, biases, dr, source) => {
-    const params = {};
-    if (q.trim()) params.q = q.trim();
-    if (biases.length > 0) params.bias = biases.join(',');
-    const range = getDateRange(dr);
-    if (range.from) params.from = range.from;
-    if (range.to) params.to = range.to;
-    if (source) {
-      if (!isNaN(source)) {
-        params.source_id = Number(source);
-      } else {
-        params.source = source;
-      }
-    }
-    onSearch(params);
-  }, [onSearch]);
-
-  // Debounce text input
+  // Only emit on user-driven changes (skip initial mount)
   useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      emitSearch(query, selectedBiases, dateRange, selectedSource);
+      const params = buildParams(query, selectedBiases, dateRange, selectedSource);
+      onSearchRef.current(params);
     }, 300);
     return () => clearTimeout(debounceRef.current);
-  }, [query, selectedBiases, dateRange, selectedSource, emitSearch]);
+  }, [query, selectedBiases, dateRange, selectedSource]);
+  // Note: onSearch is NOT a dependency — we use the ref instead
 
   function toggleBias(bias) {
     setSelectedBiases(prev =>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SearchBar from '../components/SearchBar';
@@ -11,99 +11,74 @@ function Articles() {
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filtering, setFiltering] = useState(false);
   const [searchParams, setSearchParams] = useState({});
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
-  const abortControllerRef = useRef(null);
+  const requestIdRef = useRef(0);
 
-  // Load sources for filter dropdown
+  // Load sources for filter dropdown (once)
   useEffect(() => {
-    async function loadSources() {
-      try {
-        const data = await newsAPI.getSources();
-        const allSources = [];
-        if (data?.by_bias) {
-          for (const group of Object.values(data.by_bias)) {
-            if (Array.isArray(group)) allSources.push(...group);
-          }
+    newsAPI.getSources().then(data => {
+      const allSources = [];
+      if (data?.by_bias) {
+        for (const group of Object.values(data.by_bias)) {
+          if (Array.isArray(group)) allSources.push(...group);
         }
-        setSources(allSources);
-      } catch {
-        // Non-critical
       }
-    }
-    loadSources();
+      setSources(allSources);
+    }).catch(() => {});
   }, []);
 
-  const loadArticles = useCallback(async (signal, params, currentPage, currentPageSize, isInitial = false) => {
-    try {
-      if (isInitial) {
-        setLoading(true);
-      } else {
-        setFiltering(true);
-      }
-      setError(null);
-
-      // Build API params
-      const apiParams = {
-        limit: currentPageSize,
-        offset: currentPage * currentPageSize,
-      };
-      if (params.bias) apiParams.bias = params.bias;
-      if (params.q) apiParams.q = params.q;
-      if (params.from) apiParams.from = params.from;
-      if (params.to) apiParams.to = params.to;
-      if (params.source) apiParams.source = params.source;
-      if (params.source_id) apiParams.source_id = params.source_id;
-
-      let data;
-      const hasFilters = params.q || params.bias || params.from || params.to || params.source;
-      if (hasFilters) {
-        data = await newsAPI.searchArticles(apiParams, { signal });
-      } else {
-        data = await newsAPI.getArticles(apiParams, { signal });
-      }
-
-      if (signal?.aborted) return;
-
-      setArticles(data.articles || []);
-      setTotalCount(data.total || 0);
-    } catch (err) {
-      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-      setError(err.message);
-    } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
-        setFiltering(false);
-      }
-    }
-  }, []);
-
+  // Fetch articles whenever page, pageSize, or searchParams change
   useEffect(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+    const requestId = ++requestIdRef.current;
+
+    async function fetchArticles() {
+      try {
+        setError(null);
+
+        const apiParams = {
+          limit: pageSize,
+          offset: page * pageSize,
+        };
+        if (searchParams.bias) apiParams.bias = searchParams.bias;
+        if (searchParams.q) apiParams.q = searchParams.q;
+        if (searchParams.from) apiParams.from = searchParams.from;
+        if (searchParams.to) apiParams.to = searchParams.to;
+        if (searchParams.source) apiParams.source = searchParams.source;
+        if (searchParams.source_id) apiParams.source_id = searchParams.source_id;
+
+        const hasFilters = searchParams.q || searchParams.bias || searchParams.from || searchParams.to || searchParams.source || searchParams.source_id;
+
+        let data;
+        if (hasFilters) {
+          data = await newsAPI.searchArticles(apiParams);
+        } else {
+          data = await newsAPI.getArticles(apiParams);
+        }
+
+        // Only apply if this is still the latest request
+        if (requestId !== requestIdRef.current) return;
+
+        setArticles(data.articles || []);
+        setTotalCount(data.total || 0);
+      } catch (err) {
+        if (requestId !== requestIdRef.current) return;
+        setError(err.message);
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+        }
+      }
     }
 
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    const isInitial = articles.length === 0 && page === 0;
-    loadArticles(abortController.signal, searchParams, page, pageSize, isInitial);
-
-    return () => {
-      abortController.abort();
-    };
-  }, [searchParams, page, pageSize, loadArticles]);
+    fetchArticles();
+  }, [page, pageSize, searchParams]);
 
   function handleSearch(params) {
     setPage(0);
-    setSearchParams(prev => {
-      const prevStr = JSON.stringify(prev);
-      const nextStr = JSON.stringify(params);
-      return prevStr === nextStr ? prev : params;
-    });
+    setSearchParams(params);
   }
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -123,12 +98,6 @@ function Articles() {
         showSourceFilter={true}
         placeholder="Search articles..."
       />
-
-      {filtering && (
-        <div style={{ textAlign: 'center', padding: '8px' }}>
-          <LoadingSpinner size="small" inline text="Filtering..." />
-        </div>
-      )}
 
       <div className="articles-list">
         {articles.map(article => (
@@ -163,7 +132,7 @@ function Articles() {
         ))}
       </div>
 
-      {articles.length === 0 && !filtering && (
+      {articles.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: '40px' }}>
           <p style={{ color: '#6b7280' }}>
             {searchParams.q || searchParams.bias
