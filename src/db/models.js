@@ -124,6 +124,69 @@ export const Article = {
   },
 
   /**
+   * Search articles by keyword with optional filters.
+   * Uses LIKE for full-text search on title, excerpt, and content.
+   */
+  search({ q, bias, source, from, to, limit = 50, offset = 0 }) {
+    const conditions = [];
+    const params = [];
+
+    if (q) {
+      conditions.push('(a.title LIKE ? OR a.excerpt LIKE ? OR a.content LIKE ?)');
+      const pattern = `%${q}%`;
+      params.push(pattern, pattern, pattern);
+    }
+
+    if (bias) {
+      const biasValues = bias.split(',').map(b => b.trim());
+      const placeholders = biasValues.map(() => '?').join(', ');
+      conditions.push(`s.bias IN (${placeholders})`);
+      params.push(...biasValues);
+    }
+
+    if (source) {
+      conditions.push('s.name LIKE ?');
+      params.push(`%${source}%`);
+    }
+
+    if (from) {
+      conditions.push('a.published_at >= ?');
+      params.push(from);
+    }
+
+    if (to) {
+      conditions.push('a.published_at <= ?');
+      params.push(to + 'T23:59:59.999Z');
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM articles a
+      JOIN sources s ON a.source_id = s.id
+      ${whereClause}
+    `;
+    const total = db.prepare(countQuery).get(...params).total;
+
+    // Get results
+    const query = `
+      SELECT a.*, s.name as source_name, s.bias as source_bias
+      FROM articles a
+      JOIN sources s ON a.source_id = s.id
+      ${whereClause}
+      ORDER BY a.published_at DESC
+      LIMIT ? OFFSET ?
+    `;
+    params.push(limit, offset);
+
+    const articles = db.prepare(query).all(...params);
+
+    return { articles, total };
+  },
+
+  /**
    * Get aggregated statistics using SQL instead of loading all articles
    */
   getStats() {
@@ -239,6 +302,74 @@ export const Cluster = {
       VALUES (@title, @summary, @fact_core, @confidence_score)
     `);
     return stmt.run(cluster);
+  },
+
+  update(id, updates) {
+    const allowedFields = ['title', 'summary', 'fact_core', 'confidence_score'];
+    const safeUpdates = {};
+    for (const key of Object.keys(updates)) {
+      if (allowedFields.includes(key)) {
+        safeUpdates[key] = updates[key];
+      }
+    }
+
+    if (Object.keys(safeUpdates).length === 0) {
+      return { changes: 0 };
+    }
+
+    const fields = Object.keys(safeUpdates).map(key => `${key} = @${key}`).join(', ');
+    const stmt = db.prepare(`UPDATE clusters SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = @id`);
+    return stmt.run({ ...safeUpdates, id });
+  },
+
+  /**
+   * Search clusters by keyword in title and summary.
+   */
+  search({ q, limit = 50, offset = 0 }) {
+    const pattern = `%${q}%`;
+
+    const total = db.prepare(`
+      SELECT COUNT(*) as total FROM clusters
+      WHERE title LIKE ? OR summary LIKE ? OR fact_core LIKE ?
+    `).get(pattern, pattern, pattern).total;
+
+    const clusters = db.prepare(`
+      SELECT c.*, COUNT(ac.article_id) as article_count
+      FROM clusters c
+      LEFT JOIN article_clusters ac ON c.id = ac.cluster_id
+      WHERE c.title LIKE ? OR c.summary LIKE ? OR c.fact_core LIKE ?
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(pattern, pattern, pattern, limit, offset);
+
+    return { clusters, total };
+  },
+
+  /**
+   * Get clusters with bias distribution info for blindspot detection.
+   * Returns all clusters with their article bias counts.
+   */
+  getAllWithBiasDetails() {
+    return db.prepare(`
+      SELECT
+        c.id, c.title, c.summary, c.fact_core, c.created_at,
+        COUNT(ac.article_id) as article_count,
+        SUM(CASE WHEN s.bias = 'left' THEN 1 ELSE 0 END) as left_count,
+        SUM(CASE WHEN s.bias = 'center-left' THEN 1 ELSE 0 END) as center_left_count,
+        SUM(CASE WHEN s.bias = 'center' THEN 1 ELSE 0 END) as center_count,
+        SUM(CASE WHEN s.bias = 'center-right' THEN 1 ELSE 0 END) as center_right_count,
+        SUM(CASE WHEN s.bias = 'right' THEN 1 ELSE 0 END) as right_count,
+        COUNT(DISTINCT a.source_id) as source_count,
+        AVG(a.bias_score) as avg_bias_score
+      FROM clusters c
+      JOIN article_clusters ac ON c.id = ac.cluster_id
+      JOIN articles a ON ac.article_id = a.id
+      JOIN sources s ON a.source_id = s.id
+      GROUP BY c.id
+      HAVING article_count >= 1
+      ORDER BY c.created_at DESC
+    `).all();
   },
 
   addArticle(clusterId, articleId, similarityScore) {

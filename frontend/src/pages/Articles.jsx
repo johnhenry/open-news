@@ -1,17 +1,38 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import SearchBar from '../components/SearchBar';
 import { format } from 'date-fns';
 
 function Articles() {
   const [articles, setArticles] = useState([]);
+  const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all');
   const [filtering, setFiltering] = useState(false);
+  const [searchParams, setSearchParams] = useState({});
   const abortControllerRef = useRef(null);
 
-  const loadArticles = useCallback(async (signal, isInitial = false) => {
+  // Load sources for filter dropdown
+  useEffect(() => {
+    async function loadSources() {
+      try {
+        const data = await newsAPI.getSources();
+        const allSources = [];
+        if (data?.by_bias) {
+          for (const group of Object.values(data.by_bias)) {
+            if (Array.isArray(group)) allSources.push(...group);
+          }
+        }
+        setSources(allSources);
+      } catch {
+        // Non-critical
+      }
+    }
+    loadSources();
+  }, []);
+
+  const loadArticles = useCallback(async (signal, params, isInitial = false) => {
     try {
       if (isInitial) {
         setLoading(true);
@@ -20,12 +41,24 @@ function Articles() {
       }
       setError(null);
 
-      const params = filter !== 'all' ? { bias: filter } : {};
-      const data = await newsAPI.getArticles(params, { signal });
+      // Build API params
+      const apiParams = {};
+      if (params.bias) apiParams.bias = params.bias;
+      if (params.q) apiParams.q = params.q;
+      if (params.from) apiParams.from = params.from;
+      if (params.to) apiParams.to = params.to;
+      if (params.source) apiParams.source = params.source;
+
+      let data;
+      if (params.q) {
+        data = await newsAPI.searchArticles(apiParams, { signal });
+      } else {
+        data = await newsAPI.getArticles(apiParams, { signal });
+      }
 
       if (signal?.aborted) return;
 
-      setArticles(data.articles);
+      setArticles(data.articles || []);
     } catch (err) {
       if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setError(err.message);
@@ -35,10 +68,9 @@ function Articles() {
         setFiltering(false);
       }
     }
-  }, [filter]);
+  }, []);
 
   useEffect(() => {
-    // Abort previous request if any
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -47,12 +79,16 @@ function Articles() {
     abortControllerRef.current = abortController;
 
     const isInitial = articles.length === 0;
-    loadArticles(abortController.signal, isInitial);
+    loadArticles(abortController.signal, searchParams, isInitial);
 
     return () => {
       abortController.abort();
     };
-  }, [filter, loadArticles]);
+  }, [searchParams, loadArticles]);
+
+  function handleSearch(params) {
+    setSearchParams(params);
+  }
 
   if (loading) return <LoadingSpinner text="Loading articles..." />;
   if (error) return <div className="error">Error: {error}</div>;
@@ -61,23 +97,18 @@ function Articles() {
     <div className="articles-page">
       <h1>Recent Articles</h1>
 
-      <div style={{ marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <label>Filter by bias:</label>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          disabled={filtering}
-          style={{ padding: '8px', borderRadius: '4px', border: '1px solid #e5e7eb' }}
-        >
-          <option value="all">All</option>
-          <option value="left">Left</option>
-          <option value="center-left">Center-Left</option>
-          <option value="center">Center</option>
-          <option value="center-right">Center-Right</option>
-          <option value="right">Right</option>
-        </select>
-        {filtering && <LoadingSpinner size="small" inline />}
-      </div>
+      <SearchBar
+        onSearch={handleSearch}
+        sources={sources}
+        showSourceFilter={true}
+        placeholder="Search articles..."
+      />
+
+      {filtering && (
+        <div style={{ textAlign: 'center', padding: '8px' }}>
+          <LoadingSpinner size="small" inline text="Filtering..." />
+        </div>
+      )}
 
       <div className="articles-list">
         {articles.map(article => (
@@ -112,9 +143,13 @@ function Articles() {
         ))}
       </div>
 
-      {articles.length === 0 && (
+      {articles.length === 0 && !filtering && (
         <div className="card" style={{ textAlign: 'center', padding: '40px' }}>
-          <p style={{ color: '#6b7280' }}>No articles found. Run ingestion to fetch articles.</p>
+          <p style={{ color: '#6b7280' }}>
+            {searchParams.q || searchParams.bias
+              ? 'No articles match your search criteria.'
+              : 'No articles found. Run ingestion to fetch articles.'}
+          </p>
         </div>
       )}
     </div>

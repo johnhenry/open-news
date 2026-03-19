@@ -235,6 +235,51 @@ export const newsAPI = {
   async importData(type, data, merge = false) {
     const response = await api.post('/settings/data/import', { type, data, merge });
     return response.data;
+  },
+
+  // Search endpoints (fall back gracefully if not available)
+  async searchArticles(params = {}, options = {}) {
+    try {
+      const response = await api.get('/search', { params, signal: options.signal });
+      return response.data;
+    } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      console.warn('Search API not available, falling back to articles endpoint');
+      return this.getArticles(params, options);
+    }
+  },
+
+  async searchClusters(params = {}, options = {}) {
+    try {
+      const response = await api.get('/clusters/search', { params, signal: options.signal });
+      return response.data;
+    } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      console.warn('Cluster search API not available');
+      return { clusters: [] };
+    }
+  },
+
+  async getBlindspots(options = {}) {
+    try {
+      const response = await api.get('/clusters/blindspots', { signal: options.signal });
+      return response.data;
+    } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      console.warn('Blindspots API not available yet');
+      return null;
+    }
+  },
+
+  async getClusterHeadlines(id, options = {}) {
+    try {
+      const response = await api.get(`/clusters/${id}/headlines`, { signal: options.signal });
+      return response.data;
+    } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      console.warn('Headlines API not available yet');
+      return null;
+    }
   }
 };
 

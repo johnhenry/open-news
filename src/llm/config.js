@@ -118,6 +118,21 @@ Provide a JSON response with:
     "center": ["unique points from center sources"],
     "right": ["unique points from right sources"]
   }
+}`,
+
+    cluster_summary: `You are summarizing a news story cluster. Given the following articles about the same topic, generate:
+1. A concise, descriptive title for this story (max 80 chars)
+2. A 2-3 sentence summary of the overall story
+3. A "fact core" — the key facts that all sources agree on
+
+Articles:
+{articles}
+
+Provide a JSON response with:
+{
+  "title": "A descriptive title for this story",
+  "summary": "2-3 sentence summary of the story across all sources.",
+  "fact_core": "The key facts all sources agree on, stated neutrally."
 }`
   }
 };

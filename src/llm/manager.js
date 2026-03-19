@@ -130,6 +130,15 @@ class LLMManager {
     return this.currentAdapter.findConsensus(articles);
   }
 
+  async summarizeCluster(articles) {
+    if (!this.currentAdapter) {
+      console.error('No LLM adapter available');
+      return null;
+    }
+
+    return this.currentAdapter.summarizeCluster(articles);
+  }
+
   async testAllAdapters() {
     const results = {};
     const adapterNames = ['ollama', 'lmstudio', 'openai', 'anthropic', 'gemini'];

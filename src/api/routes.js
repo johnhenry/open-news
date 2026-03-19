@@ -115,6 +115,126 @@ export async function registerRoutes(fastify) {
     };
   });
 
+  // Register static cluster routes BEFORE parametric :id route
+  fastify.get('/api/clusters/search', async (request, reply) => {
+    const { q, limit = 50, offset = 0 } = request.query;
+
+    if (!q) {
+      return reply.code(400).send(createErrorResponse(
+        'VALIDATION_ERROR',
+        'Query parameter "q" is required'
+      ));
+    }
+
+    const safeLimit = Math.max(1, Math.min(parseInt(limit) || 50, CLUSTERS.MAX_LIMIT));
+    const safeOffset = Math.max(0, parseInt(offset) || 0);
+
+    try {
+      const result = Cluster.search({
+        q,
+        limit: safeLimit,
+        offset: safeOffset
+      });
+
+      return {
+        clusters: result.clusters,
+        total: result.total,
+        limit: safeLimit,
+        offset: safeOffset
+      };
+    } catch (error) {
+      request.log.error({ err: error }, 'Cluster search failed');
+      return reply.code(500).send(createErrorResponse(
+        'SEARCH_FAILED',
+        'Failed to search clusters',
+        { detail: error.message }
+      ));
+    }
+  });
+
+  fastify.get('/api/clusters/blindspots', async (request, reply) => {
+    try {
+      const clusters = Cluster.getAllWithBiasDetails();
+
+      const blindspots = [];
+
+      for (const cluster of clusters) {
+        const total = cluster.article_count;
+        if (total === 0) continue;
+
+        const leftSide = (cluster.left_count || 0) + (cluster.center_left_count || 0);
+        const rightSide = (cluster.right_count || 0) + (cluster.center_right_count || 0);
+
+        const reasons = [];
+
+        // Check for one-sided coverage (>80% from one side)
+        if (total >= 2) {
+          const leftPct = leftSide / total;
+          const rightPct = rightSide / total;
+
+          if (leftPct > 0.8) {
+            reasons.push('left_dominated');
+          } else if (rightPct > 0.8) {
+            reasons.push('right_dominated');
+          }
+        }
+
+        // Check for underreported stories (only 1-2 sources)
+        if (cluster.source_count <= 2) {
+          reasons.push('underreported');
+        }
+
+        // Check average bias score skew
+        if (cluster.avg_bias_score !== null) {
+          if (cluster.avg_bias_score < -0.3) {
+            if (!reasons.includes('left_dominated')) reasons.push('left_leaning');
+          } else if (cluster.avg_bias_score > 0.3) {
+            if (!reasons.includes('right_dominated')) reasons.push('right_leaning');
+          }
+        }
+
+        if (reasons.length > 0) {
+          blindspots.push({
+            cluster_id: cluster.id,
+            title: cluster.title,
+            summary: cluster.summary,
+            article_count: total,
+            source_count: cluster.source_count,
+            avg_bias_score: cluster.avg_bias_score ? parseFloat(cluster.avg_bias_score.toFixed(2)) : 0,
+            bias_distribution: {
+              left: cluster.left_count || 0,
+              'center-left': cluster.center_left_count || 0,
+              center: cluster.center_count || 0,
+              'center-right': cluster.center_right_count || 0,
+              right: cluster.right_count || 0
+            },
+            blindspot_type: reasons,
+            created_at: cluster.created_at
+          });
+        }
+      }
+
+      // Sort: most extreme blindspots first
+      blindspots.sort((a, b) => {
+        const aScore = a.blindspot_type.length * a.article_count;
+        const bScore = b.blindspot_type.length * b.article_count;
+        return bScore - aScore;
+      });
+
+      return {
+        blindspots,
+        total: blindspots.length
+      };
+    } catch (error) {
+      request.log.error({ err: error }, 'Blindspot detection failed');
+      return reply.code(500).send(createErrorResponse(
+        'BLINDSPOT_FAILED',
+        'Failed to detect coverage blindspots',
+        { detail: error.message }
+      ));
+    }
+  });
+
   fastify.get('/api/clusters/:id', {
     schema: {
       params: idParamSchema
@@ -153,6 +273,73 @@ export async function registerRoutes(fastify) {
         'center-right': biasData?.center_right_count || 0,
         right: biasData?.right_count || 0
       }
+    };
+  });
+
+  fastify.get('/api/clusters/:id/headlines', {
+    schema: {
+      params: idParamSchema
+    }
+  }, async (request, reply) => {
+    const clusterId = parseInt(request.params.id);
+
+    if (isNaN(clusterId) || clusterId < 1) {
+      return reply.code(400).send(createErrorResponse(
+        'INVALID_ID',
+        'Cluster ID must be a positive integer'
+      ));
+    }
+
+    const cluster = Cluster.getById(clusterId);
+
+    if (!cluster) {
+      return reply.code(404).send(createErrorResponse(
+        'NOT_FOUND',
+        'Cluster not found'
+      ));
+    }
+
+    const articles = Article.getByCluster(clusterId);
+
+    if (articles.length === 0) {
+      return reply.code(404).send(createErrorResponse(
+        'NOT_FOUND',
+        'Cluster has no articles'
+      ));
+    }
+
+    // Group headlines by bias category
+    const headlines = {
+      left: [],
+      'center-left': [],
+      center: [],
+      'center-right': [],
+      right: []
+    };
+
+    for (const article of articles) {
+      const biasCategory = article.source_bias || 'center';
+      if (headlines[biasCategory]) {
+        headlines[biasCategory].push({
+          id: article.id,
+          source: article.source_name,
+          title: article.title,
+          bias_score: article.bias_score,
+          published_at: article.published_at,
+          url: article.url
+        });
+      }
+    }
+
+    return {
+      cluster_id: clusterId,
+      cluster_title: cluster.title,
+      left: headlines.left,
+      'center-left': headlines['center-left'],
+      center: headlines.center,
+      'center-right': headlines['center-right'],
+      right: headlines.right,
+      total_articles: articles.length
     };
   });
 
@@ -362,6 +549,58 @@ export async function registerRoutes(fastify) {
       total: logs.length
     };
   });
+
+  // ===== Search Endpoints =====
+
+  fastify.get('/api/search', async (request, reply) => {
+    const {
+      q,
+      bias,
+      source,
+      from,
+      to,
+      limit = 50,
+      offset = 0
+    } = request.query;
+
+    if (!q && !bias && !source && !from && !to) {
+      return reply.code(400).send(createErrorResponse(
+        'VALIDATION_ERROR',
+        'At least one search parameter is required (q, bias, source, from, to)'
+      ));
+    }
+
+    const safeLimit = Math.max(1, Math.min(parseInt(limit) || 50, ARTICLES.MAX_LIMIT));
+    const safeOffset = Math.max(0, parseInt(offset) || 0);
+
+    try {
+      const result = Article.search({
+        q,
+        bias,
+        source,
+        from,
+        to,
+        limit: safeLimit,
+        offset: safeOffset
+      });
+
+      return {
+        articles: result.articles,
+        total: result.total,
+        limit: safeLimit,
+        offset: safeOffset
+      };
+    } catch (error) {
+      request.log.error({ err: error }, 'Search failed');
+      return reply.code(500).send(createErrorResponse(
+        'SEARCH_FAILED',
+        'Failed to search articles',
+        { detail: error.message }
+      ));
+    }
+  });
+
+  // ===== Stats =====
 
   fastify.get('/api/stats', async (request, reply) => {
     // Check cache

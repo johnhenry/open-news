@@ -4,10 +4,14 @@ import mlDistance from 'ml-distance';
 import { Article, Cluster, Embedding } from '../db/models.js';
 import { Settings } from '../db/settings-model.js';
 import { generateEmbedding } from './embeddings.js';
+import { getLLMManager } from '../llm/manager.js';
 
 const { euclidean } = mlDistance;
 
 const TfIdf = natural.TfIdf;
+
+// Rate limit: max clusters to LLM-summarize per cycle
+const LLM_CLUSTER_SUMMARY_RATE_LIMIT = 10;
 
 export async function clusterArticles(articles) {
   if (articles.length < 2) {
@@ -18,11 +22,11 @@ export async function clusterArticles(articles) {
   // Get clustering parameters from settings
   const minClusterSize = Settings.get('min_cluster_size') || 2;
   const similarityThreshold = Settings.get('similarity_threshold') || 0.7;
-  
+
   console.log(`Using clustering parameters: minClusterSize=${minClusterSize}, similarityThreshold=${similarityThreshold}`);
 
   const keywordClusters = clusterByKeywords(articles, similarityThreshold, minClusterSize);
-  
+
   const refinedClusters = [];
   for (const cluster of keywordClusters) {
     if (cluster.length >= minClusterSize) {
@@ -37,12 +41,70 @@ export async function clusterArticles(articles) {
     if (clusterId) {
       savedClusters.push({
         id: clusterId,
-        articles: clusterArticles.length
+        articles: clusterArticles.length,
+        _articleData: clusterArticles
       });
     }
   }
 
-  return savedClusters;
+  // Fire off async LLM cluster summarization (non-blocking)
+  if (savedClusters.length > 0 && Settings.isLLMEnabled()) {
+    generateLLMClusterSummaries(savedClusters).catch(err => {
+      console.error('Async LLM cluster summarization failed:', err.message);
+    });
+  }
+
+  // Strip internal data before returning
+  return savedClusters.map(({ _articleData, ...rest }) => rest);
+}
+
+/**
+ * Generate LLM-powered summaries for newly created clusters.
+ * Rate limited to LLM_CLUSTER_SUMMARY_RATE_LIMIT per cycle.
+ * Skips clusters that already have LLM-generated summaries (non-generic ones).
+ */
+async function generateLLMClusterSummaries(savedClusters) {
+  const llmManager = getLLMManager();
+
+  // Initialize if needed
+  if (!llmManager.currentAdapter) {
+    const adapter = Settings.get('llm_adapter') || 'ollama';
+    const initialized = await llmManager.initialize(adapter);
+    if (!initialized) {
+      console.log('⚠️  LLM not available for cluster summarization');
+      return;
+    }
+  }
+
+  // Filter to clusters with 2+ articles that don't already have good summaries
+  const clustersToSummarize = savedClusters
+    .filter(c => c.articles >= 2 && c._articleData)
+    .slice(0, LLM_CLUSTER_SUMMARY_RATE_LIMIT);
+
+  if (clustersToSummarize.length === 0) return;
+
+  console.log(`🤖 Generating LLM summaries for ${clustersToSummarize.length} clusters`);
+
+  let summarized = 0;
+  for (const cluster of clustersToSummarize) {
+    try {
+      const result = await llmManager.summarizeCluster(cluster._articleData);
+
+      if (result && result.title) {
+        Cluster.update(cluster.id, {
+          title: result.title,
+          summary: result.summary || null,
+          fact_core: result.fact_core || null
+        });
+        summarized++;
+        console.log(`  ✅ Cluster ${cluster.id}: "${result.title}"`);
+      }
+    } catch (err) {
+      console.error(`  ❌ LLM summary failed for cluster ${cluster.id}:`, err.message);
+    }
+  }
+
+  console.log(`🤖 Cluster summarization complete: ${summarized}/${clustersToSummarize.length} clusters`);
 }
 
 function clusterByKeywords(articles, similarityThreshold, minClusterSize) {

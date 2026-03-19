@@ -1,17 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import BiasSpectrum from '../components/BiasSpectrum';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import ClusterCard from '../components/ClusterCard';
+import SearchBar from '../components/SearchBar';
+import BlindspotSection from '../components/BlindspotSection';
 
-const COLORS = {
-  left: '#2563eb',
-  'center-left': '#60a5fa',
-  center: '#6b7280',
-  'center-right': '#f59e0b',
-  right: '#dc2626'
-};
+const SORT_OPTIONS = [
+  { key: 'most_covered', label: 'Most Covered' },
+  { key: 'most_recent', label: 'Most Recent' },
+  { key: 'most_one_sided', label: 'Most One-Sided' },
+];
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -25,15 +25,63 @@ function timeAgo(dateStr) {
   return `${days}d ago`;
 }
 
+function sortClusters(clusters, sortBy) {
+  const sorted = [...clusters];
+  switch (sortBy) {
+    case 'most_covered':
+      return sorted.sort((a, b) => {
+        const aCount = a.article_count || a.articles?.length || 0;
+        const bCount = b.article_count || b.articles?.length || 0;
+        return bCount - aCount;
+      });
+    case 'most_recent':
+      return sorted.sort((a, b) => {
+        const aDate = new Date(a.updated_at || a.created_at || 0);
+        const bDate = new Date(b.updated_at || b.created_at || 0);
+        return bDate - aDate;
+      });
+    case 'most_one_sided': {
+      return sorted.sort((a, b) => {
+        const aDiversity = getDiversity(a);
+        const bDiversity = getDiversity(b);
+        return aDiversity - bDiversity;
+      });
+    }
+    default:
+      return sorted;
+  }
+}
+
+function getDiversity(cluster) {
+  const dist = cluster.bias_distribution || {};
+  const values = Object.values(dist).filter(v => v > 0);
+  if (values.length <= 1) return 0;
+  const total = values.reduce((s, v) => s + v, 0);
+  if (total === 0) return 0;
+  // Shannon entropy normalized
+  let entropy = 0;
+  for (const v of values) {
+    const p = v / total;
+    if (p > 0) entropy -= p * Math.log2(p);
+  }
+  return entropy;
+}
+
 function Dashboard() {
   const [stats, setStats] = useState(null);
-  const [recentClusters, setRecentClusters] = useState([]);
+  const [allClusters, setAllClusters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [dataStats, setDataStats] = useState(null);
   const [ingestionLogs, setIngestionLogs] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState('most_covered');
+  const [searchParams, setSearchParams] = useState({});
+  const [newArticleCount, setNewArticleCount] = useState(0);
+  const [showActivity, setShowActivity] = useState(false);
+  const prevArticleCount = useRef(null);
+  const pollIntervalRef = useRef(null);
 
   const loadDashboard = useCallback(async (signal) => {
     try {
@@ -42,22 +90,27 @@ function Dashboard() {
 
       const [statsData, clustersData, jobsData, dataStatsData, logsData] = await Promise.all([
         newsAPI.getStats({ signal }),
-        newsAPI.getClusters(5, 0, { signal }),
+        newsAPI.getClusters(100, 0, { signal }),
         newsAPI.getScheduledJobs({ signal }),
         newsAPI.getDataStats({ signal }),
         newsAPI.getIngestionLogs(10, { signal })
       ]);
 
-      // Check if request was aborted
       if (signal?.aborted) return;
 
       setStats(statsData);
-      setRecentClusters(clustersData.clusters);
+      setAllClusters(clustersData.clusters);
       setJobs(Array.isArray(jobsData) ? jobsData : []);
       setDataStats(dataStatsData);
       setIngestionLogs(logsData.logs || []);
+
+      // Track article count for "new articles" indicator
+      const currentCount = dataStatsData?.articles ?? statsData.total_articles;
+      if (prevArticleCount.current !== null && currentCount > prevArticleCount.current) {
+        setNewArticleCount(currentCount - prevArticleCount.current);
+      }
+      prevArticleCount.current = currentCount;
     } catch (err) {
-      // Ignore abort/cancel errors (AbortError for fetch, CanceledError for axios)
       if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setError(err.message);
     } finally {
@@ -68,22 +121,42 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
-    // Create abort controller for cleanup
     const abortController = new AbortController();
-
     loadDashboard(abortController.signal);
 
-    // Cleanup function to abort pending requests on unmount
     return () => {
       abortController.abort();
     };
   }, [loadDashboard]);
 
+  // Polling: refresh stats and jobs every 30 seconds
+  useEffect(() => {
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const [dataStatsData, jobsData] = await Promise.all([
+          newsAPI.getDataStats(),
+          newsAPI.getScheduledJobs()
+        ]);
+        setDataStats(dataStatsData);
+        setJobs(Array.isArray(jobsData) ? jobsData : []);
+
+        const currentCount = dataStatsData?.articles;
+        if (currentCount != null && prevArticleCount.current !== null && currentCount > prevArticleCount.current) {
+          setNewArticleCount(currentCount - prevArticleCount.current);
+        }
+      } catch {
+        // Silent fail for polling
+      }
+    }, 30000);
+
+    return () => clearInterval(pollIntervalRef.current);
+  }, []);
+
   async function handleRefreshNow() {
     try {
       setRefreshing(true);
       await newsAPI.triggerIngestion();
-      // Reload dashboard data after ingestion
+      setNewArticleCount(0);
       const abortController = new AbortController();
       await loadDashboard(abortController.signal);
     } catch (err) {
@@ -93,14 +166,21 @@ function Dashboard() {
     }
   }
 
+  function handleDismissNewArticles() {
+    prevArticleCount.current = dataStats?.articles ?? stats?.total_articles;
+    setNewArticleCount(0);
+    // Reload clusters
+    const abortController = new AbortController();
+    loadDashboard(abortController.signal);
+  }
+
+  function handleSearch(params) {
+    setSearchParams(params);
+  }
+
   if (loading) return <LoadingSpinner text="Loading dashboard..." />;
   if (error) return <div className="error">Error: {error}</div>;
   if (!stats) return null;
-
-  const biasData = Object.entries(stats.articles_by_bias || {}).map(([bias, count]) => ({
-    name: bias,
-    value: count
-  }));
 
   const ingestionJob = jobs.find(j => j.job_name === 'ingestion');
   const clusteringJob = jobs.find(j => j.job_name === 'clustering');
@@ -114,73 +194,68 @@ function Dashboard() {
 
   const clusteringConfig = getJobConfig(clusteringJob);
 
+  // Filter clusters by search params
+  let filteredClusters = allClusters;
+  if (searchParams.q) {
+    const q = searchParams.q.toLowerCase();
+    filteredClusters = filteredClusters.filter(c =>
+      (c.title || '').toLowerCase().includes(q) ||
+      (c.summary || '').toLowerCase().includes(q)
+    );
+  }
+  if (searchParams.bias) {
+    const biases = searchParams.bias.split(',');
+    filteredClusters = filteredClusters.filter(c => {
+      const dist = c.bias_distribution || {};
+      return biases.some(b => (dist[b] || 0) > 0);
+    });
+  }
+
+  const displayedClusters = sortClusters(filteredClusters, sortBy);
+
+  const totalArticles = dataStats?.articles ?? stats.total_articles;
+  const totalClusters = dataStats?.clusters ?? stats.total_clusters;
+  const totalSources = dataStats?.sources ?? stats.active_sources;
+
   return (
     <div className="dashboard">
-      <h1>News Aggregator Dashboard</h1>
-      <p className="page-description">
-        Monitor news coverage across the political spectrum. Track how different sources
-        cover the same stories to identify bias patterns and get a complete picture.
-      </p>
+      <div className="dashboard__hero">
+        <h1>Open News</h1>
+        <p className="page-description">
+          See how stories are covered across the political spectrum. Compare perspectives and identify blind spots.
+        </p>
+      </div>
 
       {/* Status Banner */}
-      <div style={{
-        background: '#f0f9ff',
-        border: '1px solid #bae6fd',
-        borderRadius: '8px',
-        padding: '16px 20px',
-        marginBottom: '24px',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '20px',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', flex: 1 }}>
+      <div className="dashboard__status-banner">
+        <div className="dashboard__status-items">
           {/* Ingestion Status */}
-          <div style={{ minWidth: '200px' }}>
-            <div style={{ fontWeight: '600', fontSize: '13px', color: '#0c4a6e', marginBottom: '4px' }}>
-              Last Ingestion
-            </div>
+          <div className="dashboard__status-item">
+            <div className="dashboard__status-label">Last Ingestion</div>
             {ingestionJob?.last_run ? (
-              <div style={{ fontSize: '13px', color: '#1e3a5f' }}>
-                <span style={{
-                  display: 'inline-block',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: ingestionJob.status === 'success' ? '#10b981' : ingestionJob.status === 'error' ? '#ef4444' : '#6b7280',
-                  marginRight: '6px'
-                }} />
+              <div className="dashboard__status-value">
+                <span className={`dashboard__status-dot dashboard__status-dot--${ingestionJob.status === 'success' ? 'success' : ingestionJob.status === 'error' ? 'error' : 'idle'}`} />
                 {timeAgo(ingestionJob.last_run)}
                 {ingestionJob.status === 'success' && ' - Success'}
                 {ingestionJob.status === 'error' && ' - Failed'}
                 {ingestionJob.status === 'running' && ' - Running...'}
               </div>
             ) : (
-              <div style={{ fontSize: '13px', color: '#6b7280' }}>No runs yet</div>
+              <div className="dashboard__status-value dashboard__status-value--empty">No runs yet</div>
             )}
             {ingestionJob?.next_run && (
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+              <div className="dashboard__status-next">
                 Next: {new Date(ingestionJob.next_run).toLocaleString()}
               </div>
             )}
           </div>
 
           {/* Clustering Status */}
-          <div style={{ minWidth: '200px' }}>
-            <div style={{ fontWeight: '600', fontSize: '13px', color: '#0c4a6e', marginBottom: '4px' }}>
-              Last Clustering
-            </div>
+          <div className="dashboard__status-item">
+            <div className="dashboard__status-label">Last Clustering</div>
             {clusteringJob?.last_run ? (
-              <div style={{ fontSize: '13px', color: '#1e3a5f' }}>
-                <span style={{
-                  display: 'inline-block',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: clusteringJob.status === 'success' ? '#10b981' : clusteringJob.status === 'error' ? '#ef4444' : '#6b7280',
-                  marginRight: '6px'
-                }} />
+              <div className="dashboard__status-value">
+                <span className={`dashboard__status-dot dashboard__status-dot--${clusteringJob.status === 'success' ? 'success' : clusteringJob.status === 'error' ? 'error' : 'idle'}`} />
                 {timeAgo(clusteringJob.last_run)}
                 {clusteringConfig?.clusters_created !== undefined && (
                   <span> - {clusteringConfig.clusters_created} new clusters</span>
@@ -188,34 +263,20 @@ function Dashboard() {
                 {clusteringJob.status === 'error' && ' - Failed'}
               </div>
             ) : (
-              <div style={{ fontSize: '13px', color: '#6b7280' }}>No runs yet</div>
+              <div className="dashboard__status-value dashboard__status-value--empty">No runs yet</div>
             )}
             {clusteringJob?.next_run && (
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+              <div className="dashboard__status-next">
                 Next: {new Date(clusteringJob.next_run).toLocaleString()}
               </div>
             )}
           </div>
         </div>
 
-        {/* Refresh Now Button */}
         <button
           onClick={handleRefreshNow}
           disabled={refreshing}
-          style={{
-            padding: '8px 16px',
-            background: refreshing ? '#94a3b8' : '#2563eb',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: refreshing ? 'not-allowed' : 'pointer',
-            fontSize: '13px',
-            fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            whiteSpace: 'nowrap'
-          }}
+          className={`dashboard__refresh-btn ${refreshing ? 'dashboard__refresh-btn--loading' : ''}`}
         >
           {refreshing ? (
             <>
@@ -228,119 +289,122 @@ function Dashboard() {
         </button>
       </div>
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value">{dataStats?.articles ?? stats.total_articles}</div>
-          <div className="stat-label">Total Articles</div>
+      {/* Stats Bar */}
+      <div className="dashboard__stats-bar">
+        <div className="dashboard__stat">
+          <span className="dashboard__stat-value">{totalClusters}</span>
+          <span className="dashboard__stat-label">Stories Tracked</span>
         </div>
-        <div className="stat-card">
-          <div className="stat-value">{dataStats?.clusters ?? stats.total_clusters}</div>
-          <div className="stat-label">News Clusters</div>
+        <div className="dashboard__stat-divider" />
+        <div className="dashboard__stat">
+          <span className="dashboard__stat-value">{totalSources}</span>
+          <span className="dashboard__stat-label">Sources</span>
         </div>
-        <div className="stat-card">
-          <div className="stat-value">{dataStats?.sources ?? stats.active_sources}</div>
-          <div className="stat-label">Active Sources</div>
+        <div className="dashboard__stat-divider" />
+        <div className="dashboard__stat">
+          <span className="dashboard__stat-value">{totalArticles}</span>
+          <span className="dashboard__stat-label">Articles</span>
         </div>
-        <div className="stat-card">
-          <div className="stat-value">{stats.avg_cluster_size}</div>
-          <div className="stat-label">Avg Cluster Size</div>
+        <div className="dashboard__stat-divider" />
+        <div className="dashboard__stat">
+          <span className="dashboard__stat-value">{stats.avg_cluster_size}</span>
+          <span className="dashboard__stat-label">Avg Coverage</span>
         </div>
       </div>
 
-      {/* Activity Log */}
-      {ingestionLogs.length > 0 && (
-        <div className="card" style={{ marginBottom: '24px' }}>
-          <h2>Recent Activity</h2>
-          <p className="section-hint">
-            Latest ingestion results showing articles fetched from each source.
-          </p>
-          <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
-            {ingestionLogs.map((log, i) => (
-              <div key={log.id || i} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '8px 12px',
-                borderBottom: i < ingestionLogs.length - 1 ? '1px solid #f3f4f6' : 'none',
-                fontSize: '13px'
-              }}>
-                <span style={{
-                  display: 'inline-block',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  backgroundColor: log.status === 'success' ? '#10b981' : log.status === 'failure' ? '#ef4444' : '#f59e0b'
-                }} />
-                <span style={{ color: '#6b7280', minWidth: '70px', flexShrink: 0 }}>
-                  {timeAgo(log.created_at)}
-                </span>
-                <span style={{ color: '#1f2937' }}>
-                  {log.status === 'success' && (
-                    <>Fetched <strong>{log.articles_fetched}</strong> articles from <strong>{log.source_name}</strong></>
-                  )}
-                  {log.status === 'partial' && (
-                    <>Fetched <strong>{log.articles_fetched}</strong> articles from <strong>{log.source_name}</strong> (with errors)</>
-                  )}
-                  {log.status === 'failure' && (
-                    <>Failed to fetch from <strong>{log.source_name}</strong>{log.error_message ? `: ${log.error_message.substring(0, 80)}` : ''}</>
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
+      {/* New articles indicator */}
+      {newArticleCount > 0 && (
+        <div className="dashboard__new-articles" onClick={handleDismissNewArticles}>
+          <span>{newArticleCount} new {newArticleCount === 1 ? 'article' : 'articles'} available</span>
+          <span className="dashboard__new-articles-action">Click to refresh</span>
         </div>
       )}
 
-      <div className="card">
-        <h2>Article Distribution by Bias</h2>
-        <p className="section-hint">
-          This chart shows the political leaning of your news sources. A balanced diet includes perspectives from across the spectrum.
-        </p>
-        <ResponsiveContainer width="100%" height={300}>
-          <PieChart>
-            <Pie
-              data={biasData}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-              outerRadius={80}
-              fill="#8884d8"
-              dataKey="value"
-            >
-              {biasData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[entry.name]} />
-              ))}
-            </Pie>
-            <Tooltip />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
+      {/* Search */}
+      <SearchBar onSearch={handleSearch} placeholder="Search stories..." />
 
-      <div className="card">
-        <h2>Recent News Clusters</h2>
-        <p className="section-hint">
-          News clusters group similar stories from different sources, revealing how the same event is covered differently.
-        </p>
-        <div className="clusters-list">
-          {recentClusters.map(cluster => (
-            <div key={cluster.id} className="cluster-item" style={{ marginBottom: '20px', padding: '15px', background: '#f9fafb', borderRadius: '6px' }}>
-              <Link to={`/clusters/${cluster.id}`} style={{ color: '#1f2937', textDecoration: 'none' }}>
-                <h3 style={{ marginBottom: '8px' }}>{cluster.title}</h3>
-                <p style={{ color: '#6b7280', marginBottom: '10px' }}>{cluster.summary}</p>
-                <BiasSpectrum
-                  distribution={cluster.bias_distribution || {}}
-                  articles={cluster.articles || []}
-                />
-              </Link>
-            </div>
+      {/* Sort controls */}
+      <div className="dashboard__sort-row">
+        <h2 className="dashboard__section-title">
+          Top Stories
+          <span className="dashboard__cluster-count">{displayedClusters.length}</span>
+        </h2>
+        <div className="dashboard__sort-controls">
+          {SORT_OPTIONS.map(opt => (
+            <button
+              key={opt.key}
+              className={`dashboard__sort-btn ${sortBy === opt.key ? 'dashboard__sort-btn--active' : ''}`}
+              onClick={() => setSortBy(opt.key)}
+            >
+              {opt.label}
+            </button>
           ))}
         </div>
-        <Link to="/clusters" className="button" style={{ display: 'inline-block', marginTop: '20px' }}>
-          View All Clusters
-        </Link>
       </div>
+
+      {/* Cluster Cards */}
+      <div className="dashboard__clusters-grid">
+        {displayedClusters.length > 0 ? (
+          displayedClusters.map(cluster => (
+            <ClusterCard key={cluster.id} cluster={cluster} />
+          ))
+        ) : (
+          <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
+            <p style={{ color: '#6b7280' }}>
+              {searchParams.q || searchParams.bias
+                ? 'No stories match your search criteria.'
+                : 'No story clusters yet. Run ingestion and clustering to get started.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Blindspot / Coverage Gap Section */}
+      <BlindspotSection />
+
+      {/* Activity Log (collapsible) */}
+      {ingestionLogs.length > 0 && (
+        <div className="card">
+          <div
+            className="dashboard__activity-header"
+            onClick={() => setShowActivity(!showActivity)}
+            style={{ cursor: 'pointer' }}
+          >
+            <h2>Recent Activity</h2>
+            <span className="dashboard__activity-toggle">
+              {showActivity ? 'Hide' : 'Show'}
+            </span>
+          </div>
+          {showActivity && (
+            <>
+              <p className="section-hint">
+                Latest ingestion results showing articles fetched from each source.
+              </p>
+              <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                {ingestionLogs.map((log, i) => (
+                  <div key={log.id || i} className="dashboard__activity-row">
+                    <span className={`dashboard__status-dot dashboard__status-dot--${log.status === 'success' ? 'success' : log.status === 'failure' ? 'error' : 'warning'}`} />
+                    <span className="dashboard__activity-time">
+                      {timeAgo(log.created_at)}
+                    </span>
+                    <span className="dashboard__activity-text">
+                      {log.status === 'success' && (
+                        <>Fetched <strong>{log.articles_fetched}</strong> articles from <strong>{log.source_name}</strong></>
+                      )}
+                      {log.status === 'partial' && (
+                        <>Fetched <strong>{log.articles_fetched}</strong> articles from <strong>{log.source_name}</strong> (with errors)</>
+                      )}
+                      {log.status === 'failure' && (
+                        <>Failed to fetch from <strong>{log.source_name}</strong>{log.error_message ? `: ${log.error_message.substring(0, 80)}` : ''}</>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

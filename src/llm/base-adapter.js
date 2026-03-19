@@ -59,6 +59,26 @@ export class BaseLLMAdapter {
     }
   }
 
+  async summarizeCluster(articles) {
+    const articlesText = articles.map((a, i) =>
+      `Article ${i + 1} (${a.source_name || 'Unknown'}, ${a.source_bias || 'unknown'} bias): ${a.title}\n${a.excerpt || ''}`
+    ).join('\n\n');
+
+    const prompt = this.config.prompts.cluster_summary.replace('{articles}', articlesText);
+
+    try {
+      const response = await this.complete(prompt, {
+        temperature: 0.3,
+        max_tokens: 800
+      });
+
+      return this.parseJSONResponse(response);
+    } catch (error) {
+      console.error(`Cluster summarization failed with ${this.name}:`, error.message);
+      return null;
+    }
+  }
+
   async findConsensus(articles) {
     const articlesText = articles.map((a, i) => 
       `Article ${i + 1} (${a.source_bias}): ${a.title}\n${a.excerpt || ''}`

@@ -1,0 +1,112 @@
+.blindspot-section {
+  margin-bottom: 24px;
+}
+
+.blindspot-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin: 16px 0 12px 0;
+}
+
+.blindspot-tab {
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.blindspot-tab:hover {
+  color: #374151;
+}
+
+.blindspot-tab--active {
+  color: #1f2937;
+}
+
+.blindspot-tab__count {
+  background: #f3f4f6;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.blindspot-tab--active .blindspot-tab__count {
+  background: #eff6ff;
+}
+
+.blindspot-description {
+  font-size: 13px;
+  color: #9ca3af;
+  margin-bottom: 12px;
+}
+
+.blindspot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.blindspot-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #f9fafb;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.blindspot-item:hover {
+  background: #f0f4ff;
+}
+
+.blindspot-item__title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.blindspot-item__meta {
+  font-size: 12px;
+  color: #9ca3af;
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
+.blindspot-empty {
+  padding: 24px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .blindspot-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .blindspot-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .blindspot-item__meta {
+    margin-left: 0;
+  }
+}

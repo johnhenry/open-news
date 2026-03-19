@@ -14,6 +14,9 @@ const parser = new Parser({
   }
 });
 
+// Rate limit: max articles to LLM-analyze per ingestion cycle
+const LLM_ANALYSIS_RATE_LIMIT = 5;
+
 export async function fetchRSSFeed(source) {
   const results = {
     success: [],
@@ -24,11 +27,16 @@ export async function fetchRSSFeed(source) {
   try {
     console.log(`📡 Fetching RSS feed for ${source.name}: ${source.rss_url}`);
     const feed = await parser.parseURL(source.rss_url);
-    
+
     // Get analyzer instance once for this feed
     const analyzer = await getArticleAnalyzer();
-    const shouldAnalyze = Settings.get('analysis_method') !== 'source_default';
-    
+    const analysisMethod = Settings.get('analysis_method') || 'source_default';
+    const shouldAnalyze = analysisMethod !== 'source_default';
+    const useLLM = analysisMethod === 'llm';
+
+    // Track articles needing async LLM analysis
+    const articlesForLLMAnalysis = [];
+
     for (const item of feed.items) {
       try {
         if (Article.exists(item.link)) {
@@ -58,8 +66,8 @@ export async function fetchRSSFeed(source) {
           sentiment_score: 0
         };
 
-        // Analyze article if needed
-        if (shouldAnalyze && articleData.content) {
+        // For keyword analysis, do it synchronously (fast)
+        if (shouldAnalyze && !useLLM && articleData.content) {
           const analysis = await analyzer.analyzeArticle(articleData, source.bias);
           articleData.bias = analysis.bias;
           articleData.bias_score = analysis.bias_score;
@@ -69,11 +77,20 @@ export async function fetchRSSFeed(source) {
         const article = articleData;
 
         const result = Article.create(article);
+        const articleId = result.lastInsertRowid;
         results.success.push({
-          id: result.lastInsertRowid,
+          id: articleId,
           title: article.title,
           url: article.url
         });
+
+        // Queue for async LLM analysis if conditions met
+        if (useLLM && contentMode === 'research' && articleData.content && articlesForLLMAnalysis.length < LLM_ANALYSIS_RATE_LIMIT) {
+          articlesForLLMAnalysis.push({
+            id: articleId,
+            ...articleData
+          });
+        }
 
       } catch (itemError) {
         console.error(`Error processing item ${item.link}:`, itemError.message);
@@ -91,6 +108,13 @@ export async function fetchRSSFeed(source) {
       error_message: results.errors.length > 0 ? JSON.stringify(results.errors) : null
     });
 
+    // Fire off async LLM analysis (non-blocking)
+    if (articlesForLLMAnalysis.length > 0) {
+      runAsyncLLMAnalysis(articlesForLLMAnalysis, analyzer, source.bias).catch(err => {
+        console.error('Async LLM analysis failed:', err.message);
+      });
+    }
+
   } catch (error) {
     console.error(`Failed to fetch RSS feed for ${source.name}:`, error.message);
     IngestionLog.create({
@@ -103,6 +127,34 @@ export async function fetchRSSFeed(source) {
   }
 
   return results;
+}
+
+/**
+ * Run LLM bias analysis asynchronously after ingestion completes.
+ * Processes articles sequentially to avoid overwhelming the LLM.
+ */
+async function runAsyncLLMAnalysis(articles, analyzer, sourceDefaultBias) {
+  console.log(`🤖 Starting async LLM analysis for ${articles.length} articles (rate limit: ${LLM_ANALYSIS_RATE_LIMIT})`);
+
+  let analyzed = 0;
+  for (const article of articles) {
+    try {
+      const analysis = await analyzer.llmAnalysis(article);
+      if (analysis) {
+        Article.update(article.id, {
+          bias: analysis.bias,
+          bias_score: analysis.bias_score,
+          sentiment_score: analysis.sentiment_score
+        });
+        analyzed++;
+        console.log(`  ✅ LLM analyzed: "${article.title.substring(0, 50)}..." → bias: ${analysis.bias_score}`);
+      }
+    } catch (err) {
+      console.error(`  ❌ LLM analysis failed for article ${article.id}:`, err.message);
+    }
+  }
+
+  console.log(`🤖 Async LLM analysis complete: ${analyzed}/${articles.length} articles analyzed`);
 }
 
 function extractImageUrl(item) {
