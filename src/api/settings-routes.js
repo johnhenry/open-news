@@ -96,9 +96,10 @@ export async function registerSettingsRoutes(fastify) {
       switch(adapter) {
         case 'ollama':
           try {
-            const response = await fetch('http://localhost:11434/api/tags');
-            if (response.ok) {
-              const data = await response.json();
+            const ollamaUrl = process.env.OLLAMA_BASE_URL || process.env.OLLAMA_HOST || 'http://localhost:11434';
+            const ollamaResponse = await fetch(`${ollamaUrl}/api/tags`);
+            if (ollamaResponse.ok) {
+              const data = await ollamaResponse.json();
               models = (data.models || []).map(m => ({
                 id: m.name,
                 name: m.name,
@@ -111,13 +112,27 @@ export async function registerSettingsRoutes(fastify) {
           break;
 
         case 'openai':
-          // Common OpenAI models
-          models = [
-            { id: 'gpt-4-turbo-preview', name: 'GPT-4 Turbo' },
-            { id: 'gpt-4', name: 'GPT-4' },
-            { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
-            { id: 'gpt-3.5-turbo-16k', name: 'GPT-3.5 Turbo 16K' }
-          ];
+          try {
+            const openaiUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+            const openaiKey = process.env.OPENAI_API_KEY || '';
+            const openaiResponse = await fetch(`${openaiUrl}/models`, {
+              headers: openaiKey ? { 'Authorization': `Bearer ${openaiKey}` } : {}
+            });
+            if (openaiResponse.ok) {
+              const data = await openaiResponse.json();
+              models = (data.data || []).map(m => ({
+                id: m.id,
+                name: m.id
+              }));
+            }
+          } catch (e) {
+            // Fallback to common models
+            models = [
+              { id: 'gpt-4-turbo-preview', name: 'GPT-4 Turbo' },
+              { id: 'gpt-4', name: 'GPT-4' },
+              { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+            ];
+          }
           break;
 
         case 'anthropic':
