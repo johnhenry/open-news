@@ -125,12 +125,12 @@ export async function scheduleClustering(cronExpression = null) {
           status: 'success',
           next_run: getNextRun(cronExpression),
           config: JSON.stringify({
-            clusters_created: result.newClusters,
-            clusters_updated: result.updatedClusters
+            clusters_created: result.clusters_created,
+            articles_processed: result.articles_processed
           })
         });
-        
-        console.log(`✅ Clustering completed: ${result.newClusters} new, ${result.updatedClusters} updated`);
+
+        console.log(`✅ Clustering completed: ${result.clusters_created} clusters from ${result.articles_processed} articles`);
       } catch (error) {
         console.error('❌ Clustering failed:', error);
         
