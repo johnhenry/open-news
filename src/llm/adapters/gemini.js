@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { BaseLLMAdapter } from '../base-adapter.js';
 
 export class GeminiAdapter extends BaseLLMAdapter {
@@ -11,6 +10,17 @@ export class GeminiAdapter extends BaseLLMAdapter {
     this.options = config.adapters.gemini.options;
   }
 
+  /**
+   * Get headers for Gemini API requests
+   * API key is sent via header instead of URL query param for security
+   */
+  _getHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': this.apiKey
+    };
+  }
+
   async initialize() {
     if (!this.apiKey) {
       console.error('Gemini API key not configured');
@@ -20,12 +30,10 @@ export class GeminiAdapter extends BaseLLMAdapter {
     try {
       // Test the API with a minimal request
       const response = await fetch(
-        `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`,
+        `${this.baseUrl}/models/${this.model}:generateContent`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: this._getHeaders(),
           body: JSON.stringify({
             contents: [{
               parts: [{ text: 'Hello' }]
@@ -83,12 +91,10 @@ export class GeminiAdapter extends BaseLLMAdapter {
 
     try {
       const response = await fetch(
-        `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`,
+        `${this.baseUrl}/models/${this.model}:generateContent`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: this._getHeaders(),
           body: JSON.stringify(requestBody)
         }
       );
@@ -99,7 +105,7 @@ export class GeminiAdapter extends BaseLLMAdapter {
       }
 
       const data = await response.json();
-      
+
       if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
         return data.candidates[0].content.parts[0].text;
       } else {
@@ -163,12 +169,10 @@ export class GeminiAdapter extends BaseLLMAdapter {
 
     try {
       const response = await fetch(
-        `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`,
+        `${this.baseUrl}/models/${this.model}:generateContent`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: this._getHeaders(),
           body: JSON.stringify(requestBody)
         }
       );
@@ -179,7 +183,7 @@ export class GeminiAdapter extends BaseLLMAdapter {
       }
 
       const data = await response.json();
-      
+
       if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
         return data.candidates[0].content.parts[0].text;
       } else {

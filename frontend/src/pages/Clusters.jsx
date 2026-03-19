@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -8,21 +8,33 @@ function Clusters() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadClusters();
-  }, []);
-
-  async function loadClusters() {
+  const loadClusters = useCallback(async (signal) => {
     try {
       setLoading(true);
-      const data = await newsAPI.getClusters(100, 0);
+      setError(null);
+      const data = await newsAPI.getClusters(100, 0, { signal });
+
+      if (signal?.aborted) return;
+
       setClusters(data.clusters);
     } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+    loadClusters(abortController.signal);
+
+    return () => {
+      abortController.abort();
+    };
+  }, [loadClusters]);
 
   if (loading) return <LoadingSpinner text="Loading clusters..." />;
   if (error) return <div className="error">Error: {error}</div>;
@@ -31,13 +43,13 @@ function Clusters() {
     <div className="clusters-page">
       <h1>News Clusters</h1>
       <p style={{ color: '#6b7280', marginBottom: '30px' }}>
-        Stories grouped by topic, showing coverage across the political spectrum. 
+        Stories grouped by topic, showing coverage across the political spectrum.
         Click any cluster to see how different sources frame the same story.
       </p>
-      
+
       <div className="info-box" style={{ marginBottom: '30px', padding: '15px', background: '#eff6ff', borderRadius: '8px' }}>
-        💡 <strong>Understanding Clusters:</strong> Each cluster represents the same news story covered by multiple sources. 
-        The colored badges show how many articles from each political perspective (left, center, right) are covering this story. 
+        <strong>Understanding Clusters:</strong> Each cluster represents the same news story covered by multiple sources.
+        The colored badges show how many articles from each political perspective (left, center, right) are covering this story.
         This helps you see which stories are getting attention from which parts of the media spectrum.
       </div>
 
@@ -47,7 +59,7 @@ function Clusters() {
             <Link to={`/clusters/${cluster.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
               <h2 style={{ marginBottom: '10px', fontSize: '18px' }}>{cluster.title}</h2>
               <p style={{ color: '#6b7280', marginBottom: '15px' }}>{cluster.summary}</p>
-              
+
               {cluster.fact_core && (
                 <div style={{ background: '#f3f4f6', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>
                   <strong style={{ fontSize: '12px', color: '#4b5563' }}>FACTS:</strong>

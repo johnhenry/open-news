@@ -10,9 +10,14 @@ if (!fs.existsSync(dirname(dbPath))) {
   fs.mkdirSync(dirname(dbPath), { recursive: true });
 }
 
-const db = new Database(dbPath, { verbose: console.log });
+// Only enable verbose SQL logging in development mode
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const verboseLogger = isDevelopment ? console.log : null;
+
+const db = new Database(dbPath, { verbose: verboseLogger });
 
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');
 
 export default db;

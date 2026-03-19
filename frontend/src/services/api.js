@@ -2,6 +2,9 @@ import axios from 'axios';
 
 const API_BASE = '/api';
 
+// Admin API key for protected routes (stored in localStorage)
+const ADMIN_KEY_STORAGE = 'open_news_admin_key';
+
 const api = axios.create({
   baseURL: API_BASE,
   headers: {
@@ -9,34 +12,80 @@ const api = axios.create({
   }
 });
 
+// Request interceptor to add admin key header if available
+api.interceptors.request.use((config) => {
+  const adminKey = localStorage.getItem(ADMIN_KEY_STORAGE);
+  if (adminKey) {
+    config.headers['X-Admin-Key'] = adminKey;
+  }
+  return config;
+});
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Transform error to include our standardized format
+    if (error.response?.data?.error) {
+      const apiError = new Error(error.response.data.message || 'API Error');
+      apiError.code = error.response.data.code;
+      apiError.details = error.response.data.details;
+      apiError.status = error.response.status;
+      throw apiError;
+    }
+    throw error;
+  }
+);
+
+/**
+ * Set the admin API key
+ */
+export function setAdminKey(key) {
+  if (key) {
+    localStorage.setItem(ADMIN_KEY_STORAGE, key);
+  } else {
+    localStorage.removeItem(ADMIN_KEY_STORAGE);
+  }
+}
+
+/**
+ * Check if admin key is set
+ */
+export function hasAdminKey() {
+  return !!localStorage.getItem(ADMIN_KEY_STORAGE);
+}
+
 export const newsAPI = {
-  async getStats() {
-    const response = await api.get('/stats');
+  async getStats(options = {}) {
+    const response = await api.get('/stats', { signal: options.signal });
     return response.data;
   },
 
-  async getClusters(limit = 50, offset = 0) {
-    const response = await api.get('/clusters', { params: { limit, offset } });
+  async getClusters(limit = 50, offset = 0, options = {}) {
+    const response = await api.get('/clusters', {
+      params: { limit, offset },
+      signal: options.signal
+    });
     return response.data;
   },
 
-  async getCluster(id) {
-    const response = await api.get(`/clusters/${id}`);
+  async getCluster(id, options = {}) {
+    const response = await api.get(`/clusters/${id}`, { signal: options.signal });
     return response.data;
   },
 
-  async getClusterComparison(id) {
-    const response = await api.get(`/clusters/${id}/compare`);
+  async getClusterComparison(id, options = {}) {
+    const response = await api.get(`/clusters/${id}/compare`, { signal: options.signal });
     return response.data;
   },
 
-  async getArticles(params = {}) {
-    const response = await api.get('/articles', { params });
+  async getArticles(params = {}, options = {}) {
+    const response = await api.get('/articles', { params, signal: options.signal });
     return response.data;
   },
 
-  async getSources() {
-    const response = await api.get('/sources');
+  async getSources(options = {}) {
+    const response = await api.get('/sources', { signal: options.signal });
     return response.data;
   },
 
@@ -45,14 +94,20 @@ export const newsAPI = {
     return response.data;
   },
 
-  async getIngestionLogs(limit = 20) {
-    const response = await api.get('/ingestion/logs', { params: { limit } });
+  async getIngestionLogs(limit = 20, options = {}) {
+    const response = await api.get('/ingestion/logs', {
+      params: { limit },
+      signal: options.signal
+    });
     return response.data;
   },
 
   // Settings endpoints
-  async getSettings(category = null) {
-    const response = await api.get('/settings', { params: { category } });
+  async getSettings(category = null, options = {}) {
+    const response = await api.get('/settings', {
+      params: { category },
+      signal: options.signal
+    });
     return response.data;
   },
 
@@ -67,8 +122,8 @@ export const newsAPI = {
   },
 
   // LLM endpoints
-  async getLLMAdapters() {
-    const response = await api.get('/settings/llm/adapters');
+  async getLLMAdapters(options = {}) {
+    const response = await api.get('/settings/llm/adapters', { signal: options.signal });
     return response.data;
   },
 
@@ -77,13 +132,15 @@ export const newsAPI = {
     return response.data;
   },
 
-  async getAdapterModels(adapter) {
-    const response = await api.get(`/settings/llm/adapters/${adapter}/models`);
+  async getAdapterModels(adapter, options = {}) {
+    const response = await api.get(`/settings/llm/adapters/${adapter}/models`, {
+      signal: options.signal
+    });
     return response.data;
   },
 
-  async getAPIKeys() {
-    const response = await api.get('/settings/api-keys');
+  async getAPIKeys(options = {}) {
+    const response = await api.get('/settings/api-keys', { signal: options.signal });
     return response.data;
   },
 
@@ -93,8 +150,8 @@ export const newsAPI = {
   },
 
   // Source management
-  async getSettingsSources() {
-    const response = await api.get('/settings/sources');
+  async getSettingsSources(options = {}) {
+    const response = await api.get('/settings/sources', { signal: options.signal });
     return response.data;
   },
 
@@ -119,8 +176,8 @@ export const newsAPI = {
   },
 
   // Scheduled jobs
-  async getScheduledJobs() {
-    const response = await api.get('/settings/jobs');
+  async getScheduledJobs(options = {}) {
+    const response = await api.get('/settings/jobs', { signal: options.signal });
     return response.data;
   },
 
@@ -130,8 +187,8 @@ export const newsAPI = {
   },
 
   // Data management
-  async getDataStats() {
-    const response = await api.get('/settings/data/stats');
+  async getDataStats(options = {}) {
+    const response = await api.get('/settings/data/stats', { signal: options.signal });
     return response.data;
   },
 

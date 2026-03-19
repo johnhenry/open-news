@@ -89,6 +89,11 @@ CREATE TABLE IF NOT EXISTS ingestion_log (
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_articles_source_id ON articles(source_id);
+CREATE INDEX IF NOT EXISTS idx_articles_url ON articles(url);
 CREATE INDEX IF NOT EXISTS idx_article_clusters_cluster_id ON article_clusters(cluster_id);
+CREATE INDEX IF NOT EXISTS idx_article_clusters_article_id ON article_clusters(article_id);
 CREATE INDEX IF NOT EXISTS idx_entities_article_id ON entities(article_id);
 CREATE INDEX IF NOT EXISTS idx_ingestion_log_source_id ON ingestion_log(source_id);
+CREATE INDEX IF NOT EXISTS idx_sources_bias ON sources(bias);
+CREATE INDEX IF NOT EXISTS idx_sources_active ON sources(active);
+CREATE INDEX IF NOT EXISTS idx_clusters_created_at ON clusters(created_at DESC);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -11,26 +11,38 @@ function ClusterDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadClusterDetail();
-  }, [id]);
-
-  async function loadClusterDetail() {
+  const loadClusterDetail = useCallback(async (signal) => {
     try {
       setLoading(true);
+      setError(null);
+
       const [clusterData, comparisonData] = await Promise.all([
-        newsAPI.getCluster(id),
-        newsAPI.getClusterComparison(id)
+        newsAPI.getCluster(id, { signal }),
+        newsAPI.getClusterComparison(id, { signal })
       ]);
-      
+
+      if (signal?.aborted) return;
+
       setCluster(clusterData);
       setComparison(comparisonData);
     } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
-  }
+  }, [id]);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+    loadClusterDetail(abortController.signal);
+
+    return () => {
+      abortController.abort();
+    };
+  }, [loadClusterDetail]);
 
   if (loading) return <LoadingSpinner text="Loading cluster details..." />;
   if (error) return <div className="error">Error: {error}</div>;
@@ -41,7 +53,7 @@ function ClusterDetail() {
   return (
     <div className="cluster-detail">
       <Link to="/clusters" style={{ color: '#60a5fa', textDecoration: 'none', marginBottom: '20px', display: 'inline-block' }}>
-        ← Back to Clusters
+        &larr; Back to Clusters
       </Link>
 
       <h1>{cluster.title}</h1>
@@ -49,7 +61,7 @@ function ClusterDetail() {
 
       {cluster.fact_core && (
         <div className="card" style={{ background: '#eff6ff', borderLeft: '4px solid #2563eb' }}>
-          <h3 style={{ marginBottom: '10px' }}>📊 Consensus Facts</h3>
+          <h3 style={{ marginBottom: '10px' }}>Consensus Facts</h3>
           <p>{cluster.fact_core}</p>
         </div>
       )}
@@ -76,21 +88,21 @@ function ClusterDetail() {
 
       <div className="comparison-view" style={{ marginTop: '40px' }}>
         <h2>Side-by-Side Coverage Comparison</h2>
-        
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginTop: '20px' }}>
           {biasOrder.map(bias => {
             const articles = comparison.comparisons[bias] || [];
-            
+
             return (
               <div key={bias} className="card" style={{ borderTop: `3px solid ${COLORS[bias]}` }}>
                 <h3 className={`bias-badge bias-${bias}`} style={{ marginBottom: '15px' }}>
                   {bias.toUpperCase()}
                 </h3>
-                
+
                 {articles.length > 0 ? (
                   articles.map(article => (
                     <div key={article.id} style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #e5e7eb' }}>
-                      <a href={article.url} target="_blank" rel="noopener noreferrer" 
+                      <a href={article.url} target="_blank" rel="noopener noreferrer"
                          style={{ color: '#1f2937', textDecoration: 'none' }}>
                         <h4 style={{ fontSize: '14px', marginBottom: '8px', lineHeight: '1.4' }}>
                           {article.title}

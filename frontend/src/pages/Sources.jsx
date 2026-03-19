@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -9,21 +9,33 @@ function Sources() {
   const [ingesting, setIngesting] = useState(false);
   const [message, setMessage] = useState(null);
 
-  useEffect(() => {
-    loadSources();
-  }, []);
-
-  async function loadSources() {
+  const loadSources = useCallback(async (signal) => {
     try {
       setLoading(true);
-      const data = await newsAPI.getSources();
+      setError(null);
+      const data = await newsAPI.getSources({ signal });
+
+      if (signal?.aborted) return;
+
       setSources(data);
     } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+    loadSources(abortController.signal);
+
+    return () => {
+      abortController.abort();
+    };
+  }, [loadSources]);
 
   function showMessage(text, type = 'info') {
     setMessage({ text, type });
@@ -62,7 +74,7 @@ function Sources() {
           {message.text}
         </div>
       )}
-      
+
       <div style={{ marginBottom: '30px' }}>
         <h1>News Sources</h1>
       </div>
@@ -88,14 +100,14 @@ function Sources() {
           <h2 className={`bias-badge bias-${bias}`} style={{ marginBottom: '20px' }}>
             {bias.toUpperCase()} SOURCES
           </h2>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
             {sources.by_bias[bias]?.map(source => (
               <div key={source.id} style={{ padding: '15px', background: '#f9fafb', borderRadius: '6px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                   <div style={{ flex: 1 }}>
                     <h3 style={{ fontSize: '16px', marginBottom: '5px' }}>
-                      <a href={source.url} target="_blank" rel="noopener noreferrer" 
+                      <a href={source.url} target="_blank" rel="noopener noreferrer"
                          style={{ color: '#1f2937', textDecoration: 'none' }}>
                         {source.name}
                       </a>
@@ -106,14 +118,14 @@ function Sources() {
                       </p>
                     )}
                     <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: '#9ca3af' }}>
-                      {source.rss_url && <span>✓ RSS</span>}
-                      {source.api_url && <span>✓ API</span>}
-                      {source.scraping_enabled && <span>✓ Scraper</span>}
+                      {source.rss_url && <span>RSS</span>}
+                      {source.api_url && <span>API</span>}
+                      {source.scraping_enabled && <span>Scraper</span>}
                       <span>Score: {source.bias_score}</span>
                     </div>
                   </div>
-                  <button 
-                    className="button" 
+                  <button
+                    className="button"
                     style={{ fontSize: '12px', padding: '5px 10px' }}
                     onClick={() => triggerIngestion(source.id)}
                     disabled={ingesting}

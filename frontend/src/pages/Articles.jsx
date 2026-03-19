@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { format } from 'date-fns';
@@ -9,29 +9,50 @@ function Articles() {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
   const [filtering, setFiltering] = useState(false);
+  const abortControllerRef = useRef(null);
 
-  useEffect(() => {
-    loadArticles();
-  }, [filter]);
-
-  async function loadArticles() {
+  const loadArticles = useCallback(async (signal, isInitial = false) => {
     try {
-      // Show different loading states for initial load vs filtering
-      if (articles.length === 0) {
+      if (isInitial) {
         setLoading(true);
       } else {
         setFiltering(true);
       }
+      setError(null);
+
       const params = filter !== 'all' ? { bias: filter } : {};
-      const data = await newsAPI.getArticles(params);
+      const data = await newsAPI.getArticles(params, { signal });
+
+      if (signal?.aborted) return;
+
       setArticles(data.articles);
     } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setError(err.message);
     } finally {
-      setLoading(false);
-      setFiltering(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+        setFiltering(false);
+      }
     }
-  }
+  }, [filter]);
+
+  useEffect(() => {
+    // Abort previous request if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    const isInitial = articles.length === 0;
+    loadArticles(abortController.signal, isInitial);
+
+    return () => {
+      abortController.abort();
+    };
+  }, [filter, loadArticles]);
 
   if (loading) return <LoadingSpinner text="Loading articles..." />;
   if (error) return <div className="error">Error: {error}</div>;
@@ -39,11 +60,11 @@ function Articles() {
   return (
     <div className="articles-page">
       <h1>Recent Articles</h1>
-      
+
       <div style={{ marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '10px' }}>
         <label>Filter by bias:</label>
-        <select 
-          value={filter} 
+        <select
+          value={filter}
           onChange={(e) => setFilter(e.target.value)}
           disabled={filtering}
           style={{ padding: '8px', borderRadius: '4px', border: '1px solid #e5e7eb' }}
@@ -69,18 +90,18 @@ function Articles() {
                 {article.source_name}
               </span>
             </div>
-            
-            <a href={article.url} target="_blank" rel="noopener noreferrer" 
+
+            <a href={article.url} target="_blank" rel="noopener noreferrer"
                style={{ color: '#1f2937', textDecoration: 'none' }}>
               <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>{article.title}</h2>
             </a>
-            
+
             {article.excerpt && (
               <p style={{ color: '#4b5563', marginBottom: '10px' }}>
                 {article.excerpt.substring(0, 200)}...
               </p>
             )}
-            
+
             <div style={{ display: 'flex', gap: '20px', fontSize: '14px', color: '#6b7280' }}>
               {article.author && <span>By {article.author}</span>}
               {article.published_at && (

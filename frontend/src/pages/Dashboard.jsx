@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const COLORS = {
   left: '#2563eb',
@@ -18,26 +18,43 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadDashboard();
-  }, []);
-
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async (signal) => {
     try {
       setLoading(true);
+      setError(null);
+
       const [statsData, clustersData] = await Promise.all([
-        newsAPI.getStats(),
-        newsAPI.getClusters(5, 0)
+        newsAPI.getStats({ signal }),
+        newsAPI.getClusters(5, 0, { signal })
       ]);
-      
+
+      // Check if request was aborted
+      if (signal?.aborted) return;
+
       setStats(statsData);
       setRecentClusters(clustersData.clusters);
     } catch (err) {
+      // Ignore abort/cancel errors (AbortError for fetch, CanceledError for axios)
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    // Create abort controller for cleanup
+    const abortController = new AbortController();
+
+    loadDashboard(abortController.signal);
+
+    // Cleanup function to abort pending requests on unmount
+    return () => {
+      abortController.abort();
+    };
+  }, [loadDashboard]);
 
   if (loading) return <LoadingSpinner text="Loading dashboard..." />;
   if (error) return <div className="error">Error: {error}</div>;
@@ -52,10 +69,10 @@ function Dashboard() {
     <div className="dashboard">
       <h1>News Aggregator Dashboard</h1>
       <p className="page-description">
-        Monitor news coverage across the political spectrum. Track how different sources 
+        Monitor news coverage across the political spectrum. Track how different sources
         cover the same stories to identify bias patterns and get a complete picture.
       </p>
-      
+
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-value">{stats.total_articles}</div>
