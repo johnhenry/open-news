@@ -21,17 +21,17 @@ function getDateRange(key) {
   switch (key) {
     case 'today': {
       const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      return { from: from.toISOString(), to: now.toISOString() };
+      return { from: from.toISOString().split('T')[0] };
     }
     case 'week': {
       const from = new Date(now);
       from.setDate(from.getDate() - 7);
-      return { from: from.toISOString(), to: now.toISOString() };
+      return { from: from.toISOString().split('T')[0] };
     }
     case 'month': {
       const from = new Date(now);
       from.setMonth(from.getMonth() - 1);
-      return { from: from.toISOString(), to: now.toISOString() };
+      return { from: from.toISOString().split('T')[0] };
     }
     default:
       return {};
@@ -52,7 +52,13 @@ function SearchBar({ onSearch, sources = [], showSourceFilter = false, placehold
     const range = getDateRange(dr);
     if (range.from) params.from = range.from;
     if (range.to) params.to = range.to;
-    if (source) params.source = source;
+    if (source) {
+      if (!isNaN(source)) {
+        params.source_id = Number(source);
+      } else {
+        params.source = source;
+      }
+    }
     onSearch(params);
   }, [onSearch]);
 

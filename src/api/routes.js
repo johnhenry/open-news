@@ -579,16 +579,17 @@ export async function registerRoutes(fastify) {
       q,
       bias,
       source,
+      source_id,
       from,
       to,
       limit = 50,
       offset = 0
     } = request.query;
 
-    if (!q && !bias && !source && !from && !to) {
+    if (!q && !bias && !source && !source_id && !from && !to) {
       return reply.code(400).send(createErrorResponse(
         'VALIDATION_ERROR',
-        'At least one search parameter is required (q, bias, source, from, to)'
+        'At least one search parameter is required'
       ));
     }
 
@@ -600,6 +601,7 @@ export async function registerRoutes(fastify) {
         q,
         bias,
         source,
+        source_id: source_id ? parseInt(source_id) : undefined,
         from,
         to,
         limit: safeLimit,

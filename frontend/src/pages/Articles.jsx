@@ -56,9 +56,11 @@ function Articles() {
       if (params.from) apiParams.from = params.from;
       if (params.to) apiParams.to = params.to;
       if (params.source) apiParams.source = params.source;
+      if (params.source_id) apiParams.source_id = params.source_id;
 
       let data;
-      if (params.q) {
+      const hasFilters = params.q || params.bias || params.from || params.to || params.source;
+      if (hasFilters) {
         data = await newsAPI.searchArticles(apiParams, { signal });
       } else {
         data = await newsAPI.getArticles(apiParams, { signal });
