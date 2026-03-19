@@ -1,9 +1,9 @@
-FROM node:20-alpine
+FROM node:20
 
 WORKDIR /app
 
 # Install build dependencies for better-sqlite3
-RUN apk add --no-cache python3 make g++ sqlite
+RUN apt-get update && apt-get install -y python3 make g++ sqlite3 --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
 # Copy backend package files
 COPY package*.json ./
