@@ -4,6 +4,7 @@ import { Source, Article } from '../db/models.js';
 import { fetchAllFeeds } from '../ingestion/rss-parser.js';
 import { clusterArticles } from '../clustering/cluster.js';
 import migrate from '../db/migrate.js';
+import { Settings, ScheduledJobs } from '../db/settings-model.js';
 
 async function runIngestion() {
   console.log(`\n🔄 Starting ingestion at ${new Date().toISOString()}`);
@@ -66,8 +67,10 @@ async function runClustering() {
 }
 
 export function startScheduledJobs() {
-  const ingestInterval = process.env.INGEST_INTERVAL || '*/15 * * * *';
-  const clusterInterval = process.env.CLUSTER_INTERVAL || '*/30 * * * *';
+  const ingestionJob = ScheduledJobs.get('ingestion');
+  const clusteringJob = ScheduledJobs.get('clustering');
+  const ingestInterval = ingestionJob?.cron_expression || Settings.get('ingestion_interval') || process.env.INGEST_INTERVAL || '*/15 * * * *';
+  const clusterInterval = clusteringJob?.cron_expression || Settings.get('clustering_interval') || process.env.CLUSTER_INTERVAL || '*/30 * * * *';
   
   console.log(`
   ⏰ Scheduling Jobs

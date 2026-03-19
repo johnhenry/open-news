@@ -186,6 +186,11 @@ export const newsAPI = {
     return response.data;
   },
 
+  // Alias for backwards compatibility
+  async updateJob(name, updates) {
+    return this.updateScheduledJob(name, updates);
+  },
+
   // Data management
   async getDataStats(options = {}) {
     const response = await api.get('/settings/data/stats', { signal: options.signal });

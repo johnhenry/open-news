@@ -11,6 +11,7 @@ import { registerSettingsRoutes } from './api/settings-routes.js';
 import migrate from './db/migrate.js';
 import { initializeScheduler } from './jobs/scheduler.js';
 import { RATE_LIMIT, TIMEOUTS, CONTENT } from './config/constants.js';
+import { Settings } from './db/settings-model.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
@@ -137,7 +138,7 @@ async function start() {
     🚀 API running at: http://localhost:${port}
     📊 Environment: ${process.env.NODE_ENV || 'development'}
     💾 Database: ${process.env.DB_PATH || './data/news.db'}
-    🔄 Content Mode: ${process.env.CONTENT_MODE || 'safe'}
+    🔄 Content Mode: ${Settings.get('content_mode') || process.env.CONTENT_MODE || 'safe'}
     🔒 CORS Origins: ${allowedOrigins.length > 0 ? allowedOrigins.join(', ') : 'all (development mode)'}
     `);
 

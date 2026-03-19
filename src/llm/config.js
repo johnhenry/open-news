@@ -1,6 +1,14 @@
+import { Settings } from '../db/settings-model.js';
+
 export const LLM_CONFIG = {
-  // Default adapter to use
-  default_adapter: process.env.LLM_ADAPTER || 'ollama',
+  // Default adapter to use - DB takes priority over env var
+  get default_adapter() {
+    try {
+      return Settings.get('llm_adapter') || process.env.LLM_ADAPTER || 'ollama';
+    } catch {
+      return process.env.LLM_ADAPTER || 'ollama';
+    }
+  },
   
   // Adapter-specific configurations
   adapters: {

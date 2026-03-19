@@ -1,4 +1,5 @@
 import natural from 'natural';
+import { Settings } from '../db/settings-model.js';
 
 const BIAS_MAPPING = {
   'left': -1.0,
@@ -30,8 +31,13 @@ export function getBiasLabel(biasScore) {
   return REVERSE_BIAS_MAPPING[closest.toString()];
 }
 
-export async function analyzeArticleBias(article, sourceDefaultBias) {
-  if (process.env.CONTENT_MODE !== 'research' || !article.content) {
+export async function analyzeArticleBias(article, sourceDefaultBias, contentMode = null) {
+  let effectiveMode = contentMode;
+  if (!effectiveMode) {
+    try { effectiveMode = Settings.get('content_mode') || process.env.CONTENT_MODE || 'safe'; }
+    catch { effectiveMode = process.env.CONTENT_MODE || 'safe'; }
+  }
+  if (effectiveMode !== 'research' || !article.content) {
     return {
       bias: sourceDefaultBias,
       bias_score: getBiasScore(sourceDefaultBias),

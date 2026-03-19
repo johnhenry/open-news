@@ -36,7 +36,10 @@ export async function fetchRSSFeed(source) {
           continue;
         }
 
-        const content = process.env.CONTENT_MODE === 'research' 
+        let contentMode;
+        try { contentMode = Settings.get('content_mode') || process.env.CONTENT_MODE || 'safe'; }
+        catch { contentMode = process.env.CONTENT_MODE || 'safe'; }
+        const content = contentMode === 'research'
           ? await extractContent(item.link, source.scraping_enabled)
           : null;
 

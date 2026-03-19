@@ -137,7 +137,7 @@ function Settings() {
       setAdapters(updatedAdapters);
       
       showMessage(`Model updated for ${adapterName}`, 'success', 2000);
-      await loadSettings();
+      await loadAllData();
     } catch (err) {
       showMessage(`Failed to update model for ${adapterName}`, 'error');
     }
@@ -160,7 +160,7 @@ function Settings() {
         showMessage('Settings updated', 'success', 2000);
         
         // Reload settings to get any server-side changes
-        await loadSettings();
+        await loadAllData();
         
         // Reload jobs if schedule was changed
         if (key.includes('schedule') || key.includes('cron')) {
@@ -184,7 +184,7 @@ function Settings() {
       onConfirm: async () => {
         try {
           await newsAPI.resetSettings({ category });
-          await loadSettings();
+          await loadAllData();
           showMessage('Settings reset to defaults', 'success');
         } catch (err) {
           showMessage('Failed to reset settings', 'error');
@@ -677,14 +677,36 @@ function Settings() {
                     </label>
                   </div>
                   
-                  {job.last_run && (
-                    <div className="job-info">
-                      <small>Last run: {new Date(job.last_run).toLocaleString()}</small>
-                    </div>
-                  )}
-                  
-                  <button 
-                    onClick={() => triggerJob(job.job_name)} 
+                  <div className="job-run-info" style={{ marginTop: '12px', padding: '10px', background: '#f0f9ff', borderRadius: '6px', fontSize: '13px' }}>
+                    {job.last_run ? (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                          <span className={`status-dot ${job.status === 'success' ? 'enabled' : job.status === 'error' ? 'unavailable' : 'disabled'}`} />
+                          <strong>Last run:</strong> {new Date(job.last_run).toLocaleString()}
+                          <span style={{ color: job.status === 'success' ? '#065f46' : job.status === 'error' ? '#991b1b' : '#6b7280' }}>
+                            ({job.status})
+                          </span>
+                        </div>
+                        {job.config && (() => {
+                          try {
+                            const config = typeof job.config === 'string' ? JSON.parse(job.config) : job.config;
+                            if (config.error) return <div style={{ color: '#991b1b' }}>Error: {config.error}</div>;
+                            return null;
+                          } catch { return null; }
+                        })()}
+                      </>
+                    ) : (
+                      <span style={{ color: '#6b7280' }}>No runs yet</span>
+                    )}
+                    {job.next_run && (
+                      <div style={{ marginTop: '4px', color: '#4b5563' }}>
+                        <strong>Next run:</strong> {new Date(job.next_run).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => triggerJob(job.job_name)}
                     className="trigger-button"
                     disabled={triggeringJob === job.job_name}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -749,14 +771,37 @@ function Settings() {
                     </label>
                   </div>
                   
-                  {job.last_run && (
-                    <div className="job-info">
-                      <small>Last run: {new Date(job.last_run).toLocaleString()}</small>
-                    </div>
-                  )}
-                  
-                  <button 
-                    onClick={() => triggerJob(job.job_name)} 
+                  <div className="job-run-info" style={{ marginTop: '12px', padding: '10px', background: '#f0f9ff', borderRadius: '6px', fontSize: '13px' }}>
+                    {job.last_run ? (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                          <span className={`status-dot ${job.status === 'success' ? 'enabled' : job.status === 'error' ? 'unavailable' : 'disabled'}`} />
+                          <strong>Last run:</strong> {new Date(job.last_run).toLocaleString()}
+                          <span style={{ color: job.status === 'success' ? '#065f46' : job.status === 'error' ? '#991b1b' : '#6b7280' }}>
+                            ({job.status})
+                          </span>
+                        </div>
+                        {job.config && (() => {
+                          try {
+                            const config = typeof job.config === 'string' ? JSON.parse(job.config) : job.config;
+                            if (config.clusters_created !== undefined) return <div>Clusters: {config.clusters_created} created, {config.clusters_updated} updated</div>;
+                            if (config.error) return <div style={{ color: '#991b1b' }}>Error: {config.error}</div>;
+                            return null;
+                          } catch { return null; }
+                        })()}
+                      </>
+                    ) : (
+                      <span style={{ color: '#6b7280' }}>No runs yet</span>
+                    )}
+                    {job.next_run && (
+                      <div style={{ marginTop: '4px', color: '#4b5563' }}>
+                        <strong>Next run:</strong> {new Date(job.next_run).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => triggerJob(job.job_name)}
                     className="trigger-button"
                     disabled={triggeringJob === job.job_name}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
