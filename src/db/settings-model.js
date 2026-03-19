@@ -134,6 +134,42 @@ export class Settings {
     return true;
   }
 
+  /**
+   * Sync environment variables into DB settings on startup.
+   * Env vars override DB values so config file / dokku config is authoritative.
+   */
+  static syncFromEnv() {
+    const ENV_TO_SETTING = {
+      CONTENT_MODE: 'content_mode',
+      MAX_ARTICLE_LENGTH: 'max_article_length',
+      LLM_ADAPTER: 'llm_adapter',
+      SIMILARITY_THRESHOLD: 'similarity_threshold',
+      MIN_CLUSTER_SIZE: 'min_cluster_size',
+      ANALYSIS_METHOD: 'analysis_method',
+      INGEST_INTERVAL: 'ingestion_interval',
+      CLUSTER_INTERVAL: 'clustering_interval',
+    };
+
+    let synced = 0;
+    for (const [envKey, settingKey] of Object.entries(ENV_TO_SETTING)) {
+      const envValue = process.env[envKey];
+      if (envValue !== undefined && envValue !== '') {
+        try {
+          const current = this.get(settingKey);
+          if (current !== null && String(current) !== String(envValue)) {
+            this.set(settingKey, envValue);
+            synced++;
+          }
+        } catch {
+          // Setting may not exist in DB yet
+        }
+      }
+    }
+    if (synced > 0) {
+      console.log(`📋 Synced ${synced} settings from environment variables`);
+    }
+  }
+
   static parseValue(value, type) {
     if (value === null || value === undefined) return null;
     if (type === 'boolean') return value === 'true';

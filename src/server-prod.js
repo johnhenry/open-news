@@ -33,6 +33,10 @@ const fastify = Fastify({
 import migrate from './db/migrate.js';
 migrate();
 
+// Sync env vars into DB settings (env vars are authoritative)
+import { Settings } from './db/settings-model.js';
+Settings.syncFromEnv();
+
 // Initialize scheduler
 import('./jobs/scheduler.js').then(({ initializeScheduler }) => {
   initializeScheduler();
