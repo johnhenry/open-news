@@ -1,13 +1,22 @@
 {
   "sources": [
     {
+      "name": "The Intercept",
+      "url": "https://theintercept.com",
+      "rss_url": "https://theintercept.com/feed/?rss",
+      "bias": "left",
+      "bias_score": -0.8,
+      "scraping_enabled": false,
+      "notes": "Investigative journalism, progressive perspective"
+    },
+    {
       "name": "New York Times",
       "url": "https://nytimes.com",
       "rss_url": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
       "bias": "left",
       "bias_score": -0.6,
       "scraping_enabled": false,
-      "notes": "Major US newspaper, working RSS feed"
+      "notes": "Major US newspaper"
     },
     {
       "name": "The Guardian",
@@ -16,7 +25,7 @@
       "bias": "left",
       "bias_score": -0.6,
       "scraping_enabled": false,
-      "notes": "UK-based news, good RSS support"
+      "notes": "UK-based news"
     },
     {
       "name": "ABC News",
@@ -28,10 +37,19 @@
       "notes": "US broadcast network news"
     },
     {
+      "name": "ProPublica",
+      "url": "https://propublica.org",
+      "rss_url": "https://feeds.propublica.org/propublica/main",
+      "bias": "center-left",
+      "bias_score": -0.4,
+      "scraping_enabled": false,
+      "notes": "Nonprofit investigative journalism"
+    },
+    {
       "name": "CBS News",
       "url": "https://cbsnews.com",
       "rss_url": "https://www.cbsnews.com/latest/rss/main",
-      "bias": "left",
+      "bias": "center-left",
       "bias_score": -0.4,
       "scraping_enabled": false,
       "notes": "US broadcast network news"
@@ -44,6 +62,15 @@
       "bias_score": -0.3,
       "scraping_enabled": false,
       "notes": "Public radio, quality journalism"
+    },
+    {
+      "name": "NPR Politics",
+      "url": "https://npr.org/sections/politics",
+      "rss_url": "https://feeds.npr.org/1014/rss.xml",
+      "bias": "center-left",
+      "bias_score": -0.3,
+      "scraping_enabled": false,
+      "notes": "NPR political coverage"
     },
     {
       "name": "Politico",
@@ -73,13 +100,22 @@
       "notes": "Political news"
     },
     {
-      "name": "NBC News",
-      "url": "https://nbcnews.com",
-      "rss_url": "https://feeds.nbcnews.com/nbcnews/public/news",
-      "bias": "center-left",
-      "bias_score": -0.3,
+      "name": "Axios",
+      "url": "https://axios.com",
+      "rss_url": "https://api.axios.com/feed/",
+      "bias": "center",
+      "bias_score": 0,
       "scraping_enabled": false,
-      "notes": "US broadcast network news"
+      "notes": "Smart brevity news"
+    },
+    {
+      "name": "RealClearPolitics",
+      "url": "https://realclearpolitics.com",
+      "rss_url": "https://www.realclearpolitics.com/index.xml",
+      "bias": "center",
+      "bias_score": 0.1,
+      "scraping_enabled": false,
+      "notes": "Non-partisan political news aggregator"
     },
     {
       "name": "Wall Street Journal",
@@ -91,22 +127,22 @@
       "notes": "Business and financial news"
     },
     {
-      "name": "Fox News",
-      "url": "https://foxnews.com",
-      "rss_url": "https://moxie.foxnews.com/google-publisher/latest.xml",
-      "bias": "right",
-      "bias_score": 0.7,
-      "scraping_enabled": false,
-      "notes": "Cable news network"
-    },
-    {
-      "name": "Washington Times",
-      "url": "https://washingtontimes.com",
-      "rss_url": "https://www.washingtontimes.com/rss/headlines/news/",
+      "name": "Washington Examiner",
+      "url": "https://washingtonexaminer.com",
+      "rss_url": "https://www.washingtonexaminer.com/feed",
       "bias": "right",
       "bias_score": 0.6,
       "scraping_enabled": false,
-      "notes": "Conservative newspaper"
+      "notes": "Conservative news and opinion"
+    },
+    {
+      "name": "National Review",
+      "url": "https://nationalreview.com",
+      "rss_url": "https://www.nationalreview.com/feed/",
+      "bias": "right",
+      "bias_score": 0.6,
+      "scraping_enabled": false,
+      "notes": "Conservative magazine"
     },
     {
       "name": "New York Post",
@@ -116,6 +152,24 @@
       "bias_score": 0.6,
       "scraping_enabled": false,
       "notes": "Tabloid newspaper"
+    },
+    {
+      "name": "Fox News",
+      "url": "https://foxnews.com",
+      "rss_url": "https://moxie.foxnews.com/google-publisher/latest.xml",
+      "bias": "right",
+      "bias_score": 0.7,
+      "scraping_enabled": false,
+      "notes": "Cable news network"
+    },
+    {
+      "name": "Daily Wire",
+      "url": "https://dailywire.com",
+      "rss_url": "https://www.dailywire.com/feeds/rss.xml",
+      "bias": "right",
+      "bias_score": 0.8,
+      "scraping_enabled": false,
+      "notes": "Conservative news and opinion"
     },
     {
       "name": "Breitbart",
