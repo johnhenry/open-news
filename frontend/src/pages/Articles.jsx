@@ -87,7 +87,11 @@ function Articles() {
   }, [searchParams, loadArticles]);
 
   function handleSearch(params) {
-    setSearchParams(params);
+    setSearchParams(prev => {
+      const prevStr = JSON.stringify(prev);
+      const nextStr = JSON.stringify(params);
+      return prevStr === nextStr ? prev : params;
+    });
   }
 
   if (loading) return <LoadingSpinner text="Loading articles..." />;
