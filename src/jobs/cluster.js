@@ -9,18 +9,18 @@ export async function runClustering() {
   try {
     migrate();
     
-    const recentArticles = Article.getAll(200, 0);
-    
+    const recentArticles = Article.getUnclustered(200);
+
     if (recentArticles.length < 2) {
-      console.log('⚠️  Not enough articles for clustering');
+      console.log('⚠️  Not enough unclustered articles for clustering');
       return {
         articles_processed: recentArticles.length,
         clusters_created: 0,
-        message: 'Not enough articles'
+        message: 'Not enough unclustered articles'
       };
     }
-    
-    console.log(`📊 Processing ${recentArticles.length} recent articles`);
+
+    console.log(`📊 Processing ${recentArticles.length} unclustered articles`);
     
     const clusters = await clusterArticles(recentArticles);
     

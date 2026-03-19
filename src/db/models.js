@@ -77,6 +77,17 @@ export const Article = {
     `).get(id);
   },
 
+  getUnclustered(limit = 200) {
+    return db.prepare(`
+      SELECT a.*, s.name as source_name, s.bias as source_bias
+      FROM articles a
+      JOIN sources s ON a.source_id = s.id
+      WHERE a.id NOT IN (SELECT article_id FROM article_clusters)
+      ORDER BY a.published_at DESC
+      LIMIT ?
+    `).all(limit);
+  },
+
   getByUrl(url) {
     return db.prepare('SELECT * FROM articles WHERE url = ?').get(url);
   },
