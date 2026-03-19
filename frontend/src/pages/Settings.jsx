@@ -61,49 +61,56 @@ function Settings() {
     try {
       setLoading(true);
       setDataLoaded(false);
-      
-      // Load all data in parallel for better performance
-      const [settingsData, adaptersData, sourcesData, jobsData, stats] = await Promise.all([
+
+      // Load fast data first (settings, sources, jobs, stats)
+      const [settingsData, sourcesData, jobsData, stats] = await Promise.all([
         newsAPI.getSettings(),
-        newsAPI.getLLMAdapters(),
         newsAPI.getSettingsSources(),
         newsAPI.getScheduledJobs(),
         newsAPI.getDataStats()
       ]);
-      
-      // Set basic data
+
+      // Set basic data immediately so the page renders
       setSettings(settingsData);
-      setAdapters(adaptersData.adapters);
       setSources(sourcesData.sources);
       setJobs(jobsData);
       setDataStats(stats);
-      
-      // Load models for available adapters
-      const models = {};
-      const modelPromises = [];
-      for (const adapter of adaptersData.adapters) {
-        if (adapter.available) {
-          modelPromises.push(
-            newsAPI.getAdapterModels(adapter.name)
-              .then(modelData => {
-                models[adapter.name] = modelData.models;
-                adapter.currentModel = modelData.currentModel;
-              })
-              .catch(err => {
-                console.error(`Failed to load models for ${adapter.name}:`, err);
-              })
-          );
-        }
-      }
-      
-      await Promise.all(modelPromises);
-      setAdapterModels(models);
-      
+      setLoading(false);
       setDataLoaded(true);
+
+      // Load slow LLM adapter data in background (doesn't block page)
+      newsAPI.getLLMAdapters().then(adaptersData => {
+        setAdapters(adaptersData.adapters);
+
+        // Load models for available adapters
+        const models = {};
+        const modelPromises = [];
+        for (const adapter of adaptersData.adapters) {
+          if (adapter.available) {
+            modelPromises.push(
+              newsAPI.getAdapterModels(adapter.name)
+                .then(modelData => {
+                  models[adapter.name] = modelData.models;
+                  adapter.currentModel = modelData.currentModel;
+                })
+                .catch(err => {
+                  console.error(`Failed to load models for ${adapter.name}:`, err);
+                })
+            );
+          }
+        }
+
+        return Promise.all(modelPromises).then(() => {
+          setAdapterModels(models);
+          setAdapters([...adaptersData.adapters]);
+        });
+      }).catch(err => {
+        console.error('Failed to load LLM adapters:', err);
+      });
+
     } catch (err) {
       console.error('Failed to load settings data:', err);
       showMessage('Failed to load settings data', 'error');
-    } finally {
       setLoading(false);
     }
   }
