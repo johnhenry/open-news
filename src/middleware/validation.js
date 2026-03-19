@@ -30,7 +30,7 @@ export const articleQuerySchema = {
   properties: {
     limit: { type: 'integer', minimum: 1, maximum: 500, default: 100 },
     offset: { type: 'integer', minimum: 0, default: 0 },
-    bias: { type: 'string', enum: VALID_BIAS_VALUES },
+    bias: { type: 'string' },
     source_id: { type: 'integer', minimum: 1 }
   }
 };

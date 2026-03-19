@@ -9,7 +9,7 @@ export async function runClustering() {
   try {
     migrate();
     
-    const recentArticles = Article.getUnclustered(200);
+    const recentArticles = Article.getUnclustered(1000);
 
     if (recentArticles.length < 2) {
       console.log('⚠️  Not enough unclustered articles for clustering');

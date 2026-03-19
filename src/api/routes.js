@@ -41,7 +41,8 @@ export async function registerRoutes(fastify) {
     let articles = Article.getAll(safeLimit, safeOffset);
 
     if (bias) {
-      articles = articles.filter(a => a.source_bias === bias);
+      const biasValues = bias.split(',').map(b => b.trim());
+      articles = articles.filter(a => biasValues.includes(a.source_bias));
     }
 
     if (source_id) {
