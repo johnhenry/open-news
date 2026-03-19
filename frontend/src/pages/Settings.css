@@ -861,3 +861,49 @@
 .inactive-toggle:hover {
   background: #fecaca !important;
 }
+
+/* ===== Disabled / Read-Only Styles ===== */
+
+.settings-section button:disabled,
+.settings-section .trigger-button:disabled,
+.settings-section .enable-button:disabled,
+.settings-section .disable-button:disabled,
+.settings-section .active-toggle:disabled,
+.settings-section .inactive-toggle:disabled,
+.settings-section .add-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: grayscale(40%);
+}
+
+.settings-section input:disabled,
+.settings-section select:disabled,
+.settings-section textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+}
+
+.settings-section input[type="range"]:disabled {
+  opacity: 0.4;
+}
+
+.settings-section input[type="checkbox"]:disabled {
+  opacity: 0.4;
+}
+
+.adapter-card button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: grayscale(40%);
+}
+
+.adapter-card select:disabled {
+  opacity: 0.55;
+  background-color: #f3f4f6;
+  color: #9ca3af;
+}
