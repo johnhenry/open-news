@@ -22,7 +22,6 @@ WORKDIR /app
 # Copy backend source
 COPY src/ ./src/
 COPY config/ ./config/
-COPY .env ./
 
 # Create data directory
 RUN mkdir -p data
