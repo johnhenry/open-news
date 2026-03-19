@@ -46,6 +46,21 @@ export async function requireAdminAuth(request, reply) {
 }
 
 /**
+ * Fastify preHandler hook for interactive mode check
+ * Blocks write/mutate operations when SETTINGS_INTERACTIVE is not 'true'
+ */
+export async function requireInteractiveMode(request, reply) {
+  if (process.env.SETTINGS_INTERACTIVE !== 'true') {
+    reply.code(403).send({
+      error: true,
+      code: 'READ_ONLY',
+      message: 'Settings are read-only. Set SETTINGS_INTERACTIVE=true to enable editing.'
+    });
+    return;
+  }
+}
+
+/**
  * Constant-time string comparison to prevent timing attacks
  */
 function timingSafeEqual(a, b) {

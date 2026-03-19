@@ -5,7 +5,7 @@ import { scheduleIngestion, scheduleClustering, scheduleBackup, scheduleCleanup 
 import { getDb } from '../db/index.js';
 import fs from 'fs/promises';
 import path from 'path';
-import { requireAdminAuth, isAuthConfigured } from '../middleware/auth.js';
+import { requireAdminAuth, requireInteractiveMode, isAuthConfigured } from '../middleware/auth.js';
 import {
   sourceBodySchema,
   sourceUpdateSchema,
@@ -20,6 +20,11 @@ import {
 
 export async function registerSettingsRoutes(fastify) {
 
+  // Get settings mode (public)
+  fastify.get('/api/settings/mode', async (request, reply) => {
+    return { interactive: process.env.SETTINGS_INTERACTIVE === 'true' };
+  });
+
   // Get all settings (public - read-only)
   fastify.get('/api/settings', async (request, reply) => {
     const { category } = request.query;
@@ -31,9 +36,9 @@ export async function registerSettingsRoutes(fastify) {
     return Settings.getByCategory();
   });
 
-  // Update settings (requires auth)
+  // Update settings (requires auth + interactive mode)
   fastify.put('/api/settings', {
-    preHandler: requireAdminAuth,
+    preHandler: [requireInteractiveMode, requireAdminAuth],
     schema: {
       body: settingsUpdateSchema
     }
@@ -71,9 +76,9 @@ export async function registerSettingsRoutes(fastify) {
     }
   });
 
-  // Reset settings (requires auth)
+  // Reset settings (requires auth + interactive mode)
   fastify.post('/api/settings/reset', {
-    preHandler: requireAdminAuth
+    preHandler: [requireInteractiveMode, requireAdminAuth]
   }, async (request, reply) => {
     const { category, key } = request.body || {};
 
@@ -258,9 +263,9 @@ export async function registerSettingsRoutes(fastify) {
     };
   });
 
-  // Update API keys (requires auth - sensitive operation)
+  // Update API keys (requires auth + interactive mode - sensitive operation)
   fastify.put('/api/settings/api-keys', {
-    preHandler: requireAdminAuth,
+    preHandler: [requireInteractiveMode, requireAdminAuth],
     schema: {
       body: apiKeysSchema
     }
@@ -315,9 +320,9 @@ export async function registerSettingsRoutes(fastify) {
     return { sources, grouped, total: sources.length };
   });
 
-  // Add new source (requires auth)
+  // Add new source (requires auth + interactive mode)
   fastify.post('/api/settings/sources', {
-    preHandler: requireAdminAuth,
+    preHandler: [requireInteractiveMode, requireAdminAuth],
     schema: {
       body: sourceBodySchema
     }
@@ -337,9 +342,9 @@ export async function registerSettingsRoutes(fastify) {
     }
   });
 
-  // Update source (requires auth)
+  // Update source (requires auth + interactive mode)
   fastify.put('/api/settings/sources/:id', {
-    preHandler: requireAdminAuth,
+    preHandler: [requireInteractiveMode, requireAdminAuth],
     schema: {
       params: idParamSchema,
       body: sourceUpdateSchema
@@ -361,9 +366,9 @@ export async function registerSettingsRoutes(fastify) {
     }
   });
 
-  // Delete source (requires auth)
+  // Delete source (requires auth + interactive mode)
   fastify.delete('/api/settings/sources/:id', {
-    preHandler: requireAdminAuth,
+    preHandler: [requireInteractiveMode, requireAdminAuth],
     schema: {
       params: idParamSchema
     }
@@ -382,9 +387,9 @@ export async function registerSettingsRoutes(fastify) {
     }
   });
 
-  // Toggle source active status (requires auth)
+  // Toggle source active status (requires auth + interactive mode)
   fastify.post('/api/settings/sources/:id/toggle', {
-    preHandler: requireAdminAuth,
+    preHandler: [requireInteractiveMode, requireAdminAuth],
     schema: {
       params: idParamSchema
     }
@@ -417,9 +422,9 @@ export async function registerSettingsRoutes(fastify) {
     return ScheduledJobs.getAll();
   });
 
-  // Update scheduled job (requires auth)
+  // Update scheduled job (requires auth + interactive mode)
   fastify.put('/api/settings/jobs/:name', {
-    preHandler: requireAdminAuth,
+    preHandler: [requireInteractiveMode, requireAdminAuth],
     schema: {
       body: jobUpdateSchema
     }
@@ -477,9 +482,9 @@ export async function registerSettingsRoutes(fastify) {
     return stats;
   });
 
-  // Clear cache (requires auth)
+  // Clear cache (requires auth + interactive mode)
   fastify.post('/api/settings/data/clear-cache', {
-    preHandler: requireAdminAuth
+    preHandler: [requireInteractiveMode, requireAdminAuth]
   }, async (request, reply) => {
     const { type } = request.body || {};
 
@@ -490,9 +495,9 @@ export async function registerSettingsRoutes(fastify) {
     return { success: true };
   });
 
-  // Trigger manual clustering (requires auth)
+  // Trigger manual clustering (requires auth + interactive mode)
   fastify.post('/api/settings/trigger-clustering', {
-    preHandler: requireAdminAuth
+    preHandler: [requireInteractiveMode, requireAdminAuth]
   }, async (request, reply) => {
     try {
       const { runClustering } = await import('../jobs/cluster.js');
@@ -507,9 +512,9 @@ export async function registerSettingsRoutes(fastify) {
     }
   });
 
-  // Trigger manual backup (requires auth)
+  // Trigger manual backup (requires auth + interactive mode)
   fastify.post('/api/settings/trigger-backup', {
-    preHandler: requireAdminAuth
+    preHandler: [requireInteractiveMode, requireAdminAuth]
   }, async (request, reply) => {
     try {
       const { runBackup } = await import('../jobs/backup.js');
@@ -524,9 +529,9 @@ export async function registerSettingsRoutes(fastify) {
     }
   });
 
-  // Trigger manual cleanup (requires auth)
+  // Trigger manual cleanup (requires auth + interactive mode)
   fastify.post('/api/settings/trigger-cleanup', {
-    preHandler: requireAdminAuth
+    preHandler: [requireInteractiveMode, requireAdminAuth]
   }, async (request, reply) => {
     try {
       const { runCleanup } = await import('../jobs/cleanup.js');
@@ -541,9 +546,9 @@ export async function registerSettingsRoutes(fastify) {
     }
   });
 
-  // Clear all clusters (requires auth - destructive)
+  // Clear all clusters (requires auth + interactive mode - destructive)
   fastify.post('/api/settings/data/clear-clusters', {
-    preHandler: requireAdminAuth
+    preHandler: [requireInteractiveMode, requireAdminAuth]
   }, async (request, reply) => {
     const db = getDb();
 
@@ -563,9 +568,9 @@ export async function registerSettingsRoutes(fastify) {
     }
   });
 
-  // Clean old data (requires auth - destructive)
+  // Clean old data (requires auth + interactive mode - destructive)
   fastify.post('/api/settings/data/cleanup', {
-    preHandler: requireAdminAuth,
+    preHandler: [requireInteractiveMode, requireAdminAuth],
     schema: {
       body: cleanupBodySchema
     }
@@ -667,9 +672,9 @@ export async function registerSettingsRoutes(fastify) {
     return data;
   });
 
-  // Import data (requires auth - destructive potential)
+  // Import data (requires auth + interactive mode - destructive potential)
   fastify.post('/api/settings/data/import', {
-    preHandler: requireAdminAuth,
+    preHandler: [requireInteractiveMode, requireAdminAuth],
     schema: {
       body: importBodySchema
     }

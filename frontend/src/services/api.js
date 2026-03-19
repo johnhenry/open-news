@@ -102,6 +102,12 @@ export const newsAPI = {
     return response.data;
   },
 
+  // Settings mode
+  async getSettingsMode(options = {}) {
+    const response = await api.get('/settings/mode', { signal: options.signal });
+    return response.data;
+  },
+
   // Settings endpoints
   async getSettings(category = null, options = {}) {
     const response = await api.get('/settings', {

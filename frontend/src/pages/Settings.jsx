@@ -44,6 +44,9 @@ function Settings() {
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState(null);
 
+  // Read-only mode state
+  const [readOnly, setReadOnly] = useState(true);
+
   useEffect(() => {
     loadAllData();
   }, []);
@@ -62,12 +65,13 @@ function Settings() {
       setLoading(true);
       setDataLoaded(false);
 
-      // Load fast data first (settings, sources, jobs, stats)
-      const [settingsData, sourcesData, jobsData, stats] = await Promise.all([
+      // Load fast data first (settings, sources, jobs, stats, mode)
+      const [settingsData, sourcesData, jobsData, stats, modeData] = await Promise.all([
         newsAPI.getSettings(),
         newsAPI.getSettingsSources(),
         newsAPI.getScheduledJobs(),
-        newsAPI.getDataStats()
+        newsAPI.getDataStats(),
+        newsAPI.getSettingsMode()
       ]);
 
       // Set basic data immediately so the page renders
@@ -75,6 +79,7 @@ function Settings() {
       setSources(sourcesData.sources);
       setJobs(jobsData);
       setDataStats(stats);
+      setReadOnly(!modeData.interactive);
       setLoading(false);
       setDataLoaded(true);
 
@@ -490,6 +495,12 @@ function Settings() {
     <div className="settings-page">
       <h1>Settings</h1>
       
+      {readOnly && (
+        <div className="message message-warning" style={{ marginBottom: '1rem', padding: '0.75rem 1rem', backgroundColor: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '6px', color: '#92400e' }}>
+          Settings are in read-only mode. Set SETTINGS_INTERACTIVE=true to enable editing.
+        </div>
+      )}
+
       {message && (
         <div className={`message message-${message.type}`}>
           {message.text}
@@ -561,16 +572,18 @@ function Settings() {
           <div className="settings-section">
             <div className="section-header">
               <h2>News Sources</h2>
-              <button onClick={() => setShowAddSource(true)} className="add-button">
-                + Add Source
-              </button>
+              {!readOnly && (
+                <button onClick={() => setShowAddSource(true)} className="add-button">
+                  + Add Source
+                </button>
+              )}
             </div>
             <p className="section-description">
               Manage RSS feeds and news sources. Add new sources, edit existing ones, or toggle them on/off.
             </p>
 
-            {(showAddSource || editingSource) && (
-              <SourceForm 
+            {!readOnly && (showAddSource || editingSource) && (
+              <SourceForm
                 source={editingSource || {}}
                 onSave={saveSource}
                 onCancel={() => {
@@ -592,10 +605,10 @@ function Settings() {
                       </span>
                     </div>
                     <div className="source-actions">
-                      <button 
+                      <button
                         onClick={() => toggleSource(source.id)}
                         className={source.active ? 'active-toggle' : 'inactive-toggle'}
-                        disabled={togglingSource === source.id}
+                        disabled={readOnly || togglingSource === source.id}
                         style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                       >
                         {togglingSource === source.id ? (
@@ -607,22 +620,26 @@ function Settings() {
                           source.active ? '✓ Enabled' : '○ Disabled'
                         )}
                       </button>
-                      <button onClick={() => setEditingSource(source)}>✏️ Edit</button>
-                      <button 
-                        onClick={() => deleteSource(source.id)} 
-                        className="danger"
-                        disabled={deletingSource === source.id}
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                      >
-                        {deletingSource === source.id ? (
-                          <>
-                            <LoadingSpinner size="small" inline />
-                            Deleting...
-                          </>
-                        ) : (
-                          '🗑️ Delete'
-                        )}
-                      </button>
+                      {!readOnly && (
+                        <button onClick={() => setEditingSource(source)}>✏️ Edit</button>
+                      )}
+                      {!readOnly && (
+                        <button
+                          onClick={() => deleteSource(source.id)}
+                          className="danger"
+                          disabled={deletingSource === source.id}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        >
+                          {deletingSource === source.id ? (
+                            <>
+                              <LoadingSpinner size="small" inline />
+                              Deleting...
+                            </>
+                          ) : (
+                            '🗑️ Delete'
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
               ))}
@@ -655,10 +672,10 @@ function Settings() {
                       <span className={`status-dot ${job.enabled ? 'enabled' : 'disabled'}`} />
                       {job.enabled ? 'Enabled' : 'Disabled'}
                     </div>
-                    <button 
+                    <button
                       onClick={() => toggleJob(job.job_name)}
                       className={job.enabled ? 'disable-button' : 'enable-button'}
-                      disabled={togglingJob === job.job_name}
+                      disabled={readOnly || togglingJob === job.job_name}
                       style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
                       {togglingJob === job.job_name ? (
@@ -671,19 +688,20 @@ function Settings() {
                       )}
                     </button>
                   </div>
-                  
+
                   <div className="job-schedule">
                     <label>
                       Schedule (cron expression):
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={job.cron_expression}
+                        disabled={readOnly}
                         onChange={(e) => updateJobSchedule(job.job_name, e.target.value)}
                         onBlur={() => updateJobSchedule(job.job_name, job.cron_expression)}
                       />
                     </label>
                   </div>
-                  
+
                   <div className="job-run-info" style={{ marginTop: '12px', padding: '10px', background: '#f0f9ff', borderRadius: '6px', fontSize: '13px' }}>
                     {job.last_run ? (
                       <>
@@ -715,7 +733,7 @@ function Settings() {
                   <button
                     onClick={() => triggerJob(job.job_name)}
                     className="trigger-button"
-                    disabled={triggeringJob === job.job_name}
+                    disabled={readOnly || triggeringJob === job.job_name}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   >
                     {triggeringJob === job.job_name ? (
@@ -749,10 +767,10 @@ function Settings() {
                       <span className={`status-dot ${job.enabled ? 'enabled' : 'disabled'}`} />
                       {job.enabled ? 'Enabled' : 'Disabled'}
                     </div>
-                    <button 
+                    <button
                       onClick={() => toggleJob(job.job_name)}
                       className={job.enabled ? 'disable-button' : 'enable-button'}
-                      disabled={togglingJob === job.job_name}
+                      disabled={readOnly || togglingJob === job.job_name}
                       style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
                       {togglingJob === job.job_name ? (
@@ -765,19 +783,20 @@ function Settings() {
                       )}
                     </button>
                   </div>
-                  
+
                   <div className="job-schedule">
                     <label>
                       Schedule (cron expression):
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={job.cron_expression}
+                        disabled={readOnly}
                         onChange={(e) => updateJobSchedule(job.job_name, e.target.value)}
                         onBlur={() => updateJobSchedule(job.job_name, job.cron_expression)}
                       />
                     </label>
                   </div>
-                  
+
                   <div className="job-run-info" style={{ marginTop: '12px', padding: '10px', background: '#f0f9ff', borderRadius: '6px', fontSize: '13px' }}>
                     {job.last_run ? (
                       <>
@@ -810,7 +829,7 @@ function Settings() {
                   <button
                     onClick={() => triggerJob(job.job_name)}
                     className="trigger-button"
-                    disabled={triggeringJob === job.job_name}
+                    disabled={readOnly || triggeringJob === job.job_name}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   >
                     {triggeringJob === job.job_name ? (
@@ -828,16 +847,17 @@ function Settings() {
 
             <div className="settings-group">
               <h3>Clustering Parameters</h3>
-              
+
               <div className="setting-item">
                 <label>
                   <span className="setting-label">Similarity Threshold</span>
                   <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                    <input 
+                    <input
                       type="range"
                       min="0.2"
                       max="0.9"
                       step="0.1"
+                      disabled={readOnly}
                       value={settings.ingestion?.find(s => s.key === 'similarity_threshold')?.value || 0.7}
                       onChange={(e) => updateSetting('ingestion', 'similarity_threshold', parseFloat(e.target.value))}
                       style={{flex: 1}}
@@ -851,14 +871,15 @@ function Settings() {
                   </small>
                 </label>
               </div>
-              
+
               <div className="setting-item">
                 <label>
                   <span className="setting-label">Minimum Cluster Size</span>
-                  <input 
+                  <input
                     type="number"
                     min="2"
                     max="10"
+                    disabled={readOnly}
                     value={settings.ingestion?.find(s => s.key === 'min_cluster_size')?.value || 2}
                     onChange={(e) => updateSetting('ingestion', 'min_cluster_size', parseInt(e.target.value))}
                     style={{width: '100px'}}
@@ -880,11 +901,12 @@ function Settings() {
                   <li><strong>LLM-Powered:</strong> AI-based bias detection (slowest, most accurate)</li>
                 </ul>
               </div>
-              
+
               <div className="setting-item">
                 <label>
                   <span className="setting-label">Article Analysis Method</span>
-                  <select 
+                  <select
+                    disabled={readOnly}
                     value={settings.llm?.find(s => s.key === 'analysis_method')?.value || 'source_default'}
                     onChange={(e) => updateSetting('llm', 'analysis_method', e.target.value)}
                   >
@@ -896,8 +918,9 @@ function Settings() {
               </div>
             </div>
 
+            {!readOnly && (
             <div className="action-buttons" style={{marginTop: '2rem'}}>
-              <button 
+              <button
                 onClick={clearClusters}
                 disabled={clearingClusters}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -912,6 +935,7 @@ function Settings() {
                 )}
               </button>
             </div>
+            )}
           </div>
         )}
 
@@ -956,10 +980,10 @@ function Settings() {
                     <div className="adapter-model" style={{ marginTop: '1rem' }}>
                       <div className="model-selector-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <label style={{ fontWeight: '500' }}>Model:</label>
-                        <select 
+                        <select
                           value={adapter.currentModel || ''}
                           onChange={(e) => updateAdapterModel(adapter.name, e.target.value)}
-                          disabled={loadingModels[adapter.name]}
+                          disabled={readOnly || loadingModels[adapter.name]}
                           style={{ width: '100%', padding: '0.5rem' }}
                         >
                           <option value="">Select a model...</option>
@@ -1013,8 +1037,8 @@ function Settings() {
                         'Test'
                       )}
                     </button>
-                    {!adapter.active && adapter.available && (
-                      <button 
+                    {!readOnly && !adapter.active && adapter.available && (
+                      <button
                         onClick={async () => {
                           try {
                             setSettingActiveAdapter(adapter.name);
@@ -1063,22 +1087,25 @@ function Settings() {
                   <label>
                     <span className="setting-label">{setting.description}</span>
                     {setting.type === 'boolean' ? (
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('llm', setting.key, e.target.checked)}
                       />
                     ) : setting.type === 'number' ? (
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         value={setting.value}
                         step="0.1"
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('llm', setting.key, parseFloat(e.target.value))}
                       />
                     ) : (
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('llm', setting.key, e.target.value)}
                       />
                     )}
@@ -1130,29 +1157,32 @@ function Settings() {
 
             <div className="settings-group">
               <h3>Storage Settings</h3>
-              {settings.data?.filter(setting => 
-                setting.key !== 'auto_cleanup_enabled' && 
+              {settings.data?.filter(setting =>
+                setting.key !== 'auto_cleanup_enabled' &&
                 setting.key !== 'database_backup_enabled'
               ).map(setting => (
                 <div key={setting.key} className="setting-item">
                   <label>
                     <span className="setting-label">{setting.description}</span>
                     {setting.type === 'boolean' ? (
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('data', setting.key, e.target.checked)}
                       />
                     ) : setting.type === 'number' ? (
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         value={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('data', setting.key, parseInt(e.target.value))}
                       />
                     ) : (
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('data', setting.key, e.target.value)}
                       />
                     )}
@@ -1163,10 +1193,11 @@ function Settings() {
 
             <div className="data-actions">
               <h3>Manual Maintenance</h3>
-              
+
+              {!readOnly && (
               <div className="maintenance-section">
                 <h4>Cache Management</h4>
-                <button 
+                <button
                   onClick={clearCache}
                   disabled={clearingCache}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -1181,11 +1212,12 @@ function Settings() {
                   )}
                 </button>
               </div>
+              )}
 
               <div className="maintenance-section">
                 <h4>Backup & Export</h4>
                 <div className="action-buttons">
-                  <button 
+                  <button
                     onClick={() => exportData('all')}
                     disabled={exportingData === 'all'}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -1199,7 +1231,7 @@ function Settings() {
                       '📦 Export All Data'
                     )}
                   </button>
-                  <button 
+                  <button
                     onClick={() => exportData('settings')}
                     disabled={exportingData === 'settings'}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -1213,7 +1245,7 @@ function Settings() {
                       '⚙️ Export Settings'
                     )}
                   </button>
-                  <button 
+                  <button
                     onClick={() => exportData('sources')}
                     disabled={exportingData === 'sources'}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -1230,10 +1262,11 @@ function Settings() {
                 </div>
               </div>
 
+              {!readOnly && (
               <div className="maintenance-section">
                 <h4>Restore & Import</h4>
                 <div className="action-buttons">
-                  <button 
+                  <button
                     onClick={() => importData('all')}
                     disabled={importingData === 'all'}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -1247,7 +1280,7 @@ function Settings() {
                       '📥 Import All Data'
                     )}
                   </button>
-                  <button 
+                  <button
                     onClick={() => importData('settings')}
                     disabled={importingData === 'settings'}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -1261,7 +1294,7 @@ function Settings() {
                       '⚙️ Import Settings'
                     )}
                   </button>
-                  <button 
+                  <button
                     onClick={() => importData('sources')}
                     disabled={importingData === 'sources'}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -1277,6 +1310,7 @@ function Settings() {
                   </button>
                 </div>
               </div>
+              )}
             </div>
 
             <div className="settings-group">
@@ -1300,10 +1334,10 @@ function Settings() {
                       <span className={`status-dot ${job.enabled ? 'enabled' : 'disabled'}`} />
                       {job.enabled ? 'Enabled' : 'Disabled'}
                     </div>
-                    <button 
+                    <button
                       onClick={() => toggleJob(job.job_name)}
                       className={job.enabled ? 'disable-button' : 'enable-button'}
-                      disabled={togglingJob === job.job_name}
+                      disabled={readOnly || togglingJob === job.job_name}
                       style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
                       {togglingJob === job.job_name ? (
@@ -1316,29 +1350,30 @@ function Settings() {
                       )}
                     </button>
                   </div>
-                  
+
                   <div className="job-schedule">
                     <label>
                       Schedule (cron expression):
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={job.cron_expression}
+                        disabled={readOnly}
                         onChange={(e) => updateJobSchedule(job.job_name, e.target.value)}
                         onBlur={() => updateJobSchedule(job.job_name, job.cron_expression)}
                       />
                     </label>
                   </div>
-                  
+
                   {job.last_run && (
                     <div className="job-info">
                       <small>Last run: {new Date(job.last_run).toLocaleString()}</small>
                     </div>
                   )}
-                  
-                  <button 
-                    onClick={() => triggerJob(job.job_name)} 
+
+                  <button
+                    onClick={() => triggerJob(job.job_name)}
                     className="trigger-button"
-                    disabled={triggeringJob === job.job_name}
+                    disabled={readOnly || triggeringJob === job.job_name}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}
                   >
                     {triggeringJob === job.job_name ? (
@@ -1350,16 +1385,17 @@ function Settings() {
                       '▶️ Run Now'
                     )}
                   </button>
-                  
+
                   {/* Job-specific configuration */}
                   {job.job_name === 'backup' && (
                     <div className="job-specific-config" style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb'}}>
                       <div className="setting-item">
                         <label>
                           <span className="setting-label">Backup Location</span>
-                          <input 
+                          <input
                             type="text"
                             placeholder="./backups"
+                            disabled={readOnly}
                             value={settings.data?.find(s => s.key === 'backup_location')?.value || './backups'}
                             onChange={(e) => updateSetting('data', 'backup_location', e.target.value)}
                             style={{width: '100%'}}
@@ -1371,16 +1407,17 @@ function Settings() {
                       </div>
                     </div>
                   )}
-                  
+
                   {job.job_name === 'cleanup' && (
                     <div className="job-specific-config" style={{marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb'}}>
                       <div className="setting-item">
                         <label>
                           <span className="setting-label">Article Retention Days</span>
-                          <input 
+                          <input
                             type="number"
                             min="-1"
                             max="365"
+                            disabled={readOnly}
                             value={settings.data?.find(s => s.key === 'article_retention_days')?.value || 30}
                             onChange={(e) => updateSetting('data', 'article_retention_days', parseInt(e.target.value))}
                             style={{width: '100px'}}
@@ -1411,29 +1448,33 @@ function Settings() {
                   <label>
                     <span className="setting-label">{setting.description}</span>
                     {setting.key === 'content_mode' ? (
-                      <select 
+                      <select
                         value={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('content', setting.key, e.target.value)}
                       >
                         <option value="safe">Safe Mode</option>
                         <option value="research">Research Mode</option>
                       </select>
                     ) : setting.type === 'boolean' ? (
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('content', setting.key, e.target.checked)}
                       />
                     ) : setting.type === 'number' ? (
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         value={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('content', setting.key, parseInt(e.target.value))}
                       />
                     ) : (
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('content', setting.key, e.target.value)}
                       />
                     )}
@@ -1466,21 +1507,24 @@ function Settings() {
                   <label>
                     <span className="setting-label">{setting.description}</span>
                     {setting.type === 'boolean' ? (
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('display', setting.key, e.target.checked)}
                       />
                     ) : setting.type === 'number' ? (
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         value={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('display', setting.key, parseInt(e.target.value))}
                       />
                     ) : (
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={setting.value}
+                        disabled={readOnly}
                         onChange={(e) => updateSetting('display', setting.key, e.target.value)}
                       />
                     )}
