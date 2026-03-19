@@ -146,6 +146,7 @@ export class Settings {
       SIMILARITY_THRESHOLD: 'similarity_threshold',
       MIN_CLUSTER_SIZE: 'min_cluster_size',
       ANALYSIS_METHOD: 'analysis_method',
+      LLM_CONFIDENCE_THRESHOLD: 'llm_confidence_threshold',
       INGEST_INTERVAL: 'ingestion_interval',
       CLUSTER_INTERVAL: 'clustering_interval',
     };
