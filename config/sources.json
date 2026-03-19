@@ -1,13 +1,13 @@
 {
   "sources": [
     {
-      "name": "CNN",
-      "url": "https://cnn.com",
-      "rss_url": "http://rss.cnn.com/rss/cnn_topstories.rss",
+      "name": "New York Times",
+      "url": "https://nytimes.com",
+      "rss_url": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
       "bias": "left",
-      "bias_score": -0.7,
+      "bias_score": -0.6,
       "scraping_enabled": false,
-      "notes": "Major US news network, RSS feed available"
+      "notes": "Major US newspaper, working RSS feed"
     },
     {
       "name": "The Guardian",
@@ -19,22 +19,22 @@
       "notes": "UK-based news, good RSS support"
     },
     {
-      "name": "MSNBC",
-      "url": "https://msnbc.com",
-      "rss_url": "https://feeds.nbcnews.com/msnbc/public/news",
+      "name": "ABC News",
+      "url": "https://abcnews.go.com",
+      "rss_url": "https://abcnews.go.com/abcnews/topstories",
       "bias": "left",
-      "bias_score": -0.8,
+      "bias_score": -0.5,
       "scraping_enabled": false,
-      "notes": "Cable news network"
+      "notes": "US broadcast network news"
     },
     {
-      "name": "HuffPost",
-      "url": "https://huffpost.com",
-      "rss_url": "https://www.huffpost.com/section/front-page/feed",
+      "name": "CBS News",
+      "url": "https://cbsnews.com",
+      "rss_url": "https://www.cbsnews.com/latest/rss/main",
       "bias": "left",
-      "bias_score": -0.7,
+      "bias_score": -0.4,
       "scraping_enabled": false,
-      "notes": "Digital news aggregator"
+      "notes": "US broadcast network news"
     },
     {
       "name": "NPR",
@@ -46,22 +46,13 @@
       "notes": "Public radio, quality journalism"
     },
     {
-      "name": "Associated Press",
-      "url": "https://apnews.com",
-      "rss_url": "https://feeds.apnews.com/rss/apf-topnews",
-      "bias": "center",
-      "bias_score": 0,
+      "name": "Politico",
+      "url": "https://politico.com",
+      "rss_url": "https://rss.politico.com/politics-news.xml",
+      "bias": "center-left",
+      "bias_score": -0.2,
       "scraping_enabled": false,
-      "notes": "Wire service, highly factual"
-    },
-    {
-      "name": "Reuters",
-      "url": "https://reuters.com",
-      "rss_url": "https://feeds.reuters.com/reuters/topNews",
-      "bias": "center",
-      "bias_score": 0,
-      "scraping_enabled": false,
-      "notes": "International news agency"
+      "notes": "Political news and analysis"
     },
     {
       "name": "BBC News",
@@ -73,15 +64,6 @@
       "notes": "UK public broadcaster"
     },
     {
-      "name": "USA Today",
-      "url": "https://usatoday.com",
-      "rss_url": "http://rssfeeds.usatoday.com/usatoday-NewsTopStories",
-      "bias": "center",
-      "bias_score": 0.1,
-      "scraping_enabled": false,
-      "notes": "National newspaper"
-    },
-    {
       "name": "The Hill",
       "url": "https://thehill.com",
       "rss_url": "https://thehill.com/feed/",
@@ -89,6 +71,15 @@
       "bias_score": 0,
       "scraping_enabled": false,
       "notes": "Political news"
+    },
+    {
+      "name": "NBC News",
+      "url": "https://nbcnews.com",
+      "rss_url": "https://feeds.nbcnews.com/nbcnews/public/news",
+      "bias": "center-left",
+      "bias_score": -0.3,
+      "scraping_enabled": false,
+      "notes": "US broadcast network news"
     },
     {
       "name": "Wall Street Journal",
