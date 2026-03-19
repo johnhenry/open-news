@@ -6,7 +6,7 @@
       "rss_url": "https://theintercept.com/feed/?rss",
       "bias": "left",
       "bias_score": -0.8,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Investigative journalism, progressive perspective"
     },
     {
@@ -15,7 +15,7 @@
       "rss_url": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
       "bias": "left",
       "bias_score": -0.6,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Major US newspaper"
     },
     {
@@ -24,16 +24,25 @@
       "rss_url": "https://www.theguardian.com/world/rss",
       "bias": "left",
       "bias_score": -0.6,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "UK-based news"
+    },
+    {
+      "name": "The Independent",
+      "url": "https://independent.co.uk",
+      "rss_url": "https://www.independent.co.uk/rss",
+      "bias": "center-left",
+      "bias_score": -0.5,
+      "scraping_enabled": true,
+      "notes": "UK digital newspaper, liberal editorial stance"
     },
     {
       "name": "ABC News",
       "url": "https://abcnews.go.com",
       "rss_url": "https://abcnews.go.com/abcnews/topstories",
-      "bias": "left",
+      "bias": "center-left",
       "bias_score": -0.5,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "US broadcast network news"
     },
     {
@@ -42,7 +51,7 @@
       "rss_url": "https://feeds.propublica.org/propublica/main",
       "bias": "center-left",
       "bias_score": -0.4,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Nonprofit investigative journalism"
     },
     {
@@ -51,8 +60,17 @@
       "rss_url": "https://www.cbsnews.com/latest/rss/main",
       "bias": "center-left",
       "bias_score": -0.4,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "US broadcast network news"
+    },
+    {
+      "name": "Washington Post",
+      "url": "https://washingtonpost.com",
+      "rss_url": "https://feeds.washingtonpost.com/rss/politics",
+      "bias": "center-left",
+      "bias_score": -0.3,
+      "scraping_enabled": true,
+      "notes": "Major US newspaper, strong political coverage"
     },
     {
       "name": "NPR",
@@ -60,17 +78,35 @@
       "rss_url": "https://feeds.npr.org/1001/rss.xml",
       "bias": "center-left",
       "bias_score": -0.3,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Public radio, quality journalism"
     },
     {
-      "name": "NPR Politics",
-      "url": "https://npr.org/sections/politics",
-      "rss_url": "https://feeds.npr.org/1014/rss.xml",
+      "name": "NBC News",
+      "url": "https://nbcnews.com",
+      "rss_url": "https://feeds.nbcnews.com/nbcnews/public/news",
       "bias": "center-left",
       "bias_score": -0.3,
-      "scraping_enabled": false,
-      "notes": "NPR political coverage"
+      "scraping_enabled": true,
+      "notes": "US broadcast network news"
+    },
+    {
+      "name": "LA Times",
+      "url": "https://latimes.com",
+      "rss_url": "https://www.latimes.com/politics/rss2.0.xml",
+      "bias": "center-left",
+      "bias_score": -0.3,
+      "scraping_enabled": true,
+      "notes": "Largest US metro daily, strong national coverage"
+    },
+    {
+      "name": "Al Jazeera English",
+      "url": "https://aljazeera.com",
+      "rss_url": "https://www.aljazeera.com/xml/rss/all.xml",
+      "bias": "center-left",
+      "bias_score": -0.2,
+      "scraping_enabled": true,
+      "notes": "Qatar-based international news, different perspective on US policy"
     },
     {
       "name": "Politico",
@@ -78,8 +114,44 @@
       "rss_url": "https://rss.politico.com/politics-news.xml",
       "bias": "center-left",
       "bias_score": -0.2,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Political news and analysis"
+    },
+    {
+      "name": "Deutsche Welle",
+      "url": "https://dw.com",
+      "rss_url": "https://rss.dw.com/rdf/rss-en-all",
+      "bias": "center",
+      "bias_score": -0.1,
+      "scraping_enabled": true,
+      "notes": "Germany's international broadcaster"
+    },
+    {
+      "name": "France 24",
+      "url": "https://france24.com/en",
+      "rss_url": "https://www.france24.com/en/rss",
+      "bias": "center",
+      "bias_score": -0.1,
+      "scraping_enabled": true,
+      "notes": "French international news network"
+    },
+    {
+      "name": "CBC World",
+      "url": "https://cbc.ca/news/world",
+      "rss_url": "https://rss.cbc.ca/lineup/world.xml",
+      "bias": "center",
+      "bias_score": -0.1,
+      "scraping_enabled": true,
+      "notes": "Canada's public broadcaster"
+    },
+    {
+      "name": "ABC Australia",
+      "url": "https://abc.net.au/news",
+      "rss_url": "https://www.abc.net.au/news/feed/51120/rss.xml",
+      "bias": "center",
+      "bias_score": -0.1,
+      "scraping_enabled": true,
+      "notes": "Australia's public broadcaster"
     },
     {
       "name": "BBC News",
@@ -87,7 +159,7 @@
       "rss_url": "http://feeds.bbci.co.uk/news/rss.xml",
       "bias": "center",
       "bias_score": 0,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "UK public broadcaster"
     },
     {
@@ -96,7 +168,7 @@
       "rss_url": "https://thehill.com/feed/",
       "bias": "center",
       "bias_score": 0,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Political news"
     },
     {
@@ -105,8 +177,62 @@
       "rss_url": "https://api.axios.com/feed/",
       "bias": "center",
       "bias_score": 0,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Smart brevity news"
+    },
+    {
+      "name": "UPI",
+      "url": "https://upi.com",
+      "rss_url": "https://www.upi.com/rss/TopNews",
+      "bias": "center",
+      "bias_score": 0,
+      "scraping_enabled": true,
+      "notes": "Wire service, factual neutral reporting"
+    },
+    {
+      "name": "Newsweek",
+      "url": "https://newsweek.com",
+      "rss_url": "https://www.newsweek.com/rss",
+      "bias": "center",
+      "bias_score": 0,
+      "scraping_enabled": true,
+      "notes": "US news magazine, broad political spectrum"
+    },
+    {
+      "name": "Christian Science Monitor",
+      "url": "https://csmonitor.com",
+      "rss_url": "https://rss.csmonitor.com/feeds/all",
+      "bias": "center",
+      "bias_score": 0,
+      "scraping_enabled": true,
+      "notes": "Highly respected balanced reporting"
+    },
+    {
+      "name": "South China Morning Post",
+      "url": "https://scmp.com",
+      "rss_url": "https://www.scmp.com/rss/91/feed",
+      "bias": "center",
+      "bias_score": 0,
+      "scraping_enabled": true,
+      "notes": "Hong Kong-based, Asian perspective on global affairs"
+    },
+    {
+      "name": "Japan Times",
+      "url": "https://japantimes.co.jp",
+      "rss_url": "https://www.japantimes.co.jp/feed/",
+      "bias": "center",
+      "bias_score": 0,
+      "scraping_enabled": true,
+      "notes": "Japan's largest English-language newspaper"
+    },
+    {
+      "name": "Times of Israel",
+      "url": "https://timesofisrael.com",
+      "rss_url": "https://www.timesofisrael.com/feed/",
+      "bias": "center",
+      "bias_score": 0.1,
+      "scraping_enabled": true,
+      "notes": "Israeli English-language news"
     },
     {
       "name": "RealClearPolitics",
@@ -114,8 +240,35 @@
       "rss_url": "https://www.realclearpolitics.com/index.xml",
       "bias": "center",
       "bias_score": 0.1,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Non-partisan political news aggregator"
+    },
+    {
+      "name": "Sky News",
+      "url": "https://news.sky.com",
+      "rss_url": "https://feeds.skynews.com/feeds/rss/home.xml",
+      "bias": "center",
+      "bias_score": 0.1,
+      "scraping_enabled": true,
+      "notes": "UK-based 24-hour news"
+    },
+    {
+      "name": "The Economist",
+      "url": "https://economist.com",
+      "rss_url": "https://www.economist.com/united-states/rss.xml",
+      "bias": "center",
+      "bias_score": 0.1,
+      "scraping_enabled": true,
+      "notes": "Prestigious international weekly, classical liberal"
+    },
+    {
+      "name": "Reason Magazine",
+      "url": "https://reason.com",
+      "rss_url": "https://reason.com/feed/",
+      "bias": "center-right",
+      "bias_score": 0.3,
+      "scraping_enabled": true,
+      "notes": "Libertarian perspective, skeptical of both parties"
     },
     {
       "name": "Wall Street Journal",
@@ -123,8 +276,35 @@
       "rss_url": "https://feeds.a.dj.com/rss/RSSWorldNews.xml",
       "bias": "center-right",
       "bias_score": 0.3,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Business and financial news"
+    },
+    {
+      "name": "The Telegraph",
+      "url": "https://telegraph.co.uk",
+      "rss_url": "https://www.telegraph.co.uk/rss.xml",
+      "bias": "center-right",
+      "bias_score": 0.3,
+      "scraping_enabled": true,
+      "notes": "Major UK broadsheet, center-right editorial"
+    },
+    {
+      "name": "The American Conservative",
+      "url": "https://theamericanconservative.com",
+      "rss_url": "https://www.theamericanconservative.com/feed/",
+      "bias": "center-right",
+      "bias_score": 0.4,
+      "scraping_enabled": true,
+      "notes": "Paleoconservative, anti-interventionist perspective"
+    },
+    {
+      "name": "Washington Times",
+      "url": "https://washingtontimes.com",
+      "rss_url": "https://www.washingtontimes.com/rss/headlines/news/politics/",
+      "bias": "center-right",
+      "bias_score": 0.4,
+      "scraping_enabled": true,
+      "notes": "DC-based daily, conservative-leaning"
     },
     {
       "name": "Washington Examiner",
@@ -132,7 +312,7 @@
       "rss_url": "https://www.washingtonexaminer.com/feed",
       "bias": "right",
       "bias_score": 0.6,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Conservative news and opinion"
     },
     {
@@ -141,8 +321,17 @@
       "rss_url": "https://www.nationalreview.com/feed/",
       "bias": "right",
       "bias_score": 0.6,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Conservative magazine"
+    },
+    {
+      "name": "Daily Signal",
+      "url": "https://dailysignal.com",
+      "rss_url": "https://www.dailysignal.com/feed/",
+      "bias": "right",
+      "bias_score": 0.6,
+      "scraping_enabled": true,
+      "notes": "Heritage Foundation news outlet, policy-focused"
     },
     {
       "name": "New York Post",
@@ -150,7 +339,7 @@
       "rss_url": "https://nypost.com/feed/",
       "bias": "right",
       "bias_score": 0.6,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Tabloid newspaper"
     },
     {
@@ -159,8 +348,26 @@
       "rss_url": "https://moxie.foxnews.com/google-publisher/latest.xml",
       "bias": "right",
       "bias_score": 0.7,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Cable news network"
+    },
+    {
+      "name": "Newsmax",
+      "url": "https://newsmax.com",
+      "rss_url": "https://www.newsmax.com/rss/Newsfront/1/",
+      "bias": "right",
+      "bias_score": 0.7,
+      "scraping_enabled": true,
+      "notes": "Right-leaning US news network"
+    },
+    {
+      "name": "RedState",
+      "url": "https://redstate.com",
+      "rss_url": "https://www.redstate.com/feed/",
+      "bias": "right",
+      "bias_score": 0.7,
+      "scraping_enabled": true,
+      "notes": "Conservative news and commentary"
     },
     {
       "name": "Daily Wire",
@@ -168,7 +375,7 @@
       "rss_url": "https://www.dailywire.com/feeds/rss.xml",
       "bias": "right",
       "bias_score": 0.8,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Conservative news and opinion"
     },
     {
@@ -177,7 +384,7 @@
       "rss_url": "https://feeds.feedburner.com/breitbart",
       "bias": "right",
       "bias_score": 0.9,
-      "scraping_enabled": false,
+      "scraping_enabled": true,
       "notes": "Conservative news site"
     }
   ]

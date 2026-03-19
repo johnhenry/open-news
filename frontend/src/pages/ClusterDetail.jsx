@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import BiasSpectrum from '../components/BiasSpectrum';
 import { format } from 'date-fns';
 
 function ClusterDetail() {
@@ -50,6 +51,11 @@ function ClusterDetail() {
 
   const biasOrder = ['left', 'center-left', 'center', 'center-right', 'right'];
 
+  // Flatten all articles from comparison for the spectrum tooltip
+  const allArticles = biasOrder.flatMap(bias =>
+    (comparison.comparisons[bias] || []).map(a => ({ ...a, bias }))
+  );
+
   return (
     <div className="cluster-detail">
       <Link to="/clusters" style={{ color: '#60a5fa', textDecoration: 'none', marginBottom: '20px', display: 'inline-block' }}>
@@ -67,23 +73,17 @@ function ClusterDetail() {
       )}
 
       <div className="card">
-        <h2>Bias Distribution</h2>
-        <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
-          {Object.entries(cluster.bias_distribution.percentages).map(([bias, percent]) => (
-            <div key={bias} style={{ textAlign: 'center' }}>
-              <div className={`bias-badge bias-${bias}`} style={{ marginBottom: '8px' }}>
-                {bias}
-              </div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{percent}%</div>
-              <div style={{ color: '#6b7280', fontSize: '14px' }}>
-                {cluster.article_counts[bias]} articles
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ marginTop: '20px' }}>
-          <strong>Diversity Score:</strong> {cluster.bias_distribution.diversity_score} / 1.00
-        </div>
+        <h2>Coverage Spectrum</h2>
+        <BiasSpectrum
+          distribution={cluster.article_counts || cluster.bias_distribution?.counts || {}}
+          articles={allArticles}
+          size="large"
+        />
+        {cluster.bias_distribution?.diversity_score != null && (
+          <div style={{ marginTop: '16px', color: '#6b7280', fontSize: '14px' }}>
+            <strong>Diversity Score:</strong> {cluster.bias_distribution.diversity_score} / 1.00
+          </div>
+        )}
       </div>
 
       <div className="comparison-view" style={{ marginTop: '40px' }}>

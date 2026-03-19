@@ -1,0 +1,149 @@
+/* BiasSpectrum Component */
+
+.bias-spectrum {
+  width: 100%;
+  margin: 12px 0 4px 0;
+}
+
+.bias-spectrum--large {
+  margin: 16px 0 8px 0;
+}
+
+/* The horizontal bar */
+.bias-spectrum__bar {
+  display: flex;
+  width: 100%;
+  border-radius: 6px;
+  overflow: visible;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+/* Individual segment */
+.bias-spectrum__segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+  min-width: 4px;
+}
+
+.bias-spectrum__segment:hover {
+  filter: brightness(1.15);
+  z-index: 2;
+}
+
+.bias-spectrum__segment--active {
+  filter: brightness(1.15);
+  z-index: 2;
+}
+
+/* Count number inside the segment */
+.bias-spectrum__count {
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  user-select: none;
+  pointer-events: none;
+}
+
+.bias-spectrum--large .bias-spectrum__count {
+  font-size: 15px;
+}
+
+/* Tooltip on hover */
+.bias-spectrum__tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  animation: biasTooltipFadeIn 0.12s ease-out;
+}
+
+.bias-spectrum__tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #1f2937;
+}
+
+@keyframes biasTooltipFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.bias-spectrum__tooltip-header {
+  font-weight: 700;
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+
+.bias-spectrum__tooltip-count {
+  color: #9ca3af;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.bias-spectrum__tooltip-sources {
+  border-top: 1px solid #374151;
+  padding-top: 4px;
+  margin-top: 4px;
+}
+
+.bias-spectrum__tooltip-source {
+  font-size: 11px;
+  color: #d1d5db;
+  line-height: 1.4;
+}
+
+/* Labels below bar */
+.bias-spectrum__labels {
+  display: flex;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.bias-spectrum__label {
+  text-align: center;
+  overflow: hidden;
+}
+
+.bias-spectrum__label-text {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.bias-spectrum--large .bias-spectrum__label-text {
+  font-size: 12px;
+}
+
+/* Summary text */
+.bias-spectrum__summary {
+  color: #6b7280;
+  font-size: 13px;
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.bias-spectrum--large .bias-spectrum__summary {
+  font-size: 14px;
+  margin-top: 8px;
+}

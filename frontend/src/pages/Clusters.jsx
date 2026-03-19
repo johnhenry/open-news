@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import BiasSpectrum from '../components/BiasSpectrum';
 
 function Clusters() {
   const [clusters, setClusters] = useState([]);
@@ -49,8 +50,8 @@ function Clusters() {
 
       <div className="info-box" style={{ marginBottom: '30px', padding: '15px', background: '#eff6ff', borderRadius: '8px' }}>
         <strong>Understanding Clusters:</strong> Each cluster represents the same news story covered by multiple sources.
-        The colored badges show how many articles from each political perspective (left, center, right) are covering this story.
-        This helps you see which stories are getting attention from which parts of the media spectrum.
+        The spectrum bar shows how many articles from each political perspective cover this story.
+        Hover over any segment to see the source names. This helps you see which parts of the media spectrum are paying attention.
       </div>
 
       <div className="clusters-grid">
@@ -67,20 +68,10 @@ function Clusters() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {Object.entries(cluster.bias_distribution || {}).map(([bias, count]) => (
-                    count > 0 && (
-                      <span key={bias} className={`bias-badge bias-${bias}`}>
-                        {count}
-                      </span>
-                    )
-                  ))}
-                </div>
-                <span style={{ color: '#6b7280', fontSize: '14px' }}>
-                  {cluster.article_count} articles
-                </span>
-              </div>
+              <BiasSpectrum
+                distribution={cluster.bias_distribution || {}}
+                articles={cluster.articles || []}
+              />
             </Link>
           </div>
         ))}

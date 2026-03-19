@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import BiasSpectrum from '../components/BiasSpectrum';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const COLORS = {
@@ -129,15 +130,10 @@ function Dashboard() {
               <Link to={`/clusters/${cluster.id}`} style={{ color: '#1f2937', textDecoration: 'none' }}>
                 <h3 style={{ marginBottom: '8px' }}>{cluster.title}</h3>
                 <p style={{ color: '#6b7280', marginBottom: '10px' }}>{cluster.summary}</p>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {Object.entries(cluster.bias_distribution || {}).map(([bias, count]) => (
-                    count > 0 && (
-                      <span key={bias} className={`bias-badge bias-${bias}`}>
-                        {bias}: {count}
-                      </span>
-                    )
-                  ))}
-                </div>
+                <BiasSpectrum
+                  distribution={cluster.bias_distribution || {}}
+                  articles={cluster.articles || []}
+                />
               </Link>
             </div>
           ))}
