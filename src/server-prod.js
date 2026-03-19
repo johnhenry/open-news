@@ -46,7 +46,7 @@ await registerRoutes(fastify);
 await registerSettingsRoutes(fastify);
 
 // Serve static files from the built frontend
-const frontendDistPath = path.join(__dirname, '../frontend/dist');
+const frontendDistPath = path.join(__dirname, '../frontend/build');
 
 // Register static file serving
 await fastify.register(fastifyStatic, {

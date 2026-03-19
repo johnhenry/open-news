@@ -30,4 +30,4 @@ RUN mkdir -p data
 EXPOSE 3000 3001
 
 # Run migrations and start server
-CMD ["sh", "-c", "node src/db/migrate.js && node src/utils/seed-sources.js && node src/server.js"]
+CMD ["sh", "-c", "node src/db/migrate.js && node src/utils/seed-sources.js && node src/server-prod.js"]
