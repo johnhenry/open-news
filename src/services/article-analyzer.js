@@ -141,8 +141,12 @@ class ArticleAnalyzer {
 
     try {
       const biasResult = await this.llmManager.detectBias(article.content);
-      
-      if (biasResult && biasResult.bias_score !== undefined) {
+
+      if (!biasResult || biasResult._failed) {
+        return { _failed: true, reason: biasResult?.reasoning || 'LLM returned no result' };
+      }
+
+      if (biasResult.bias_score !== undefined) {
         return {
           bias: getBiasLabel(biasResult.bias_score),
           bias_score: biasResult.bias_score,
@@ -153,11 +157,11 @@ class ArticleAnalyzer {
           indicators: biasResult.indicators || []
         };
       }
-      
-      return null;
+
+      return { _failed: true, reason: 'No bias_score in response' };
     } catch (error) {
       console.error('Error in LLM analysis:', error);
-      return null;
+      return { _failed: true, reason: error.message };
     }
   }
 }

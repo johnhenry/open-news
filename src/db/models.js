@@ -2,7 +2,7 @@ import db from './database.js';
 
 // Field whitelists for safe updates
 const ALLOWED_SOURCE_FIELDS = ['name', 'url', 'rss_url', 'api_url', 'bias', 'bias_score', 'scraping_enabled', 'active', 'notes'];
-const ALLOWED_ARTICLE_FIELDS = ['title', 'excerpt', 'content', 'image_url', 'bias', 'bias_score', 'sentiment_score', 'analysis_method', 'llm_confidence', 'llm_reasoning', 'llm_indicators', 'llm_facts'];
+const ALLOWED_ARTICLE_FIELDS = ['title', 'excerpt', 'content', 'image_url', 'bias', 'bias_score', 'sentiment_score', 'analysis_method', 'llm_confidence', 'llm_reasoning', 'llm_indicators', 'llm_facts', 'llm_retry_count'];
 
 /**
  * Filter object to only include allowed fields
@@ -79,6 +79,19 @@ export const Article = {
       JOIN sources s ON a.source_id = s.id
       WHERE a.id = ?
     `).get(id);
+  },
+
+  getFailedLLM(limit = 50, maxRetries = 3) {
+    return db.prepare(`
+      SELECT a.*, s.name as source_name, s.bias as source_bias
+      FROM articles a
+      JOIN sources s ON a.source_id = s.id
+      WHERE a.analysis_method = 'llm_failed'
+        AND (a.llm_retry_count IS NULL OR a.llm_retry_count < ?)
+        AND a.content IS NOT NULL AND length(a.content) > 0
+      ORDER BY a.llm_retry_count ASC, a.published_at DESC
+      LIMIT ?
+    `).all(maxRetries, limit);
   },
 
   getUnclustered(limit = 200) {

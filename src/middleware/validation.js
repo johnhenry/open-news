@@ -32,7 +32,7 @@ export const articleQuerySchema = {
     offset: { type: 'integer', minimum: 0, default: 0 },
     bias: { type: 'string' },
     source_id: { type: 'integer', minimum: 1 },
-    analysis_method: { type: 'string', enum: ['source_default', 'keyword', 'llm'] }
+    analysis_method: { type: 'string', enum: ['source_default', 'keyword', 'llm', 'llm_failed', 'llm_skipped'] }
   }
 };
 

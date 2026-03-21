@@ -73,6 +73,14 @@ function migrate() {
       }
     }
 
+    // Add retry count column
+    try {
+      db.exec('ALTER TABLE articles ADD COLUMN llm_retry_count INTEGER DEFAULT 0');
+      console.log('  Added llm_retry_count column to articles');
+    } catch (err) {
+      // Column already exists
+    }
+
     console.log('✅ Database migration completed successfully');
   } catch (error) {
     console.error('❌ Database migration failed:', error);

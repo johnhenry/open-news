@@ -42,6 +42,8 @@ const ANALYSIS_OPTIONS = [
   { key: '', label: 'All' },
   { key: 'llm', label: 'AI Analyzed' },
   { key: 'keyword', label: 'Keyword' },
+  { key: 'llm_failed', label: 'AI Failed (retrying)' },
+  { key: 'llm_skipped', label: 'AI Skipped' },
   { key: 'source_default', label: 'Unanalyzed' },
 ];
 

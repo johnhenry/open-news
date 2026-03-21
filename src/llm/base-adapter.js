@@ -189,7 +189,8 @@ export class BaseLLMAdapter {
       bias_score: 0,
       confidence: 0,
       reasoning: reason,
-      indicators: []
+      indicators: [],
+      _failed: true
     };
   }
 

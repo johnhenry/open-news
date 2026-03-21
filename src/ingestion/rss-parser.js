@@ -140,48 +140,85 @@ export async function fetchRSSFeed(source) {
  * Processes articles sequentially to avoid overwhelming the LLM.
  */
 async function runAsyncLLMAnalysis(articles, analyzer, sourceDefaultBias) {
-  console.log(`🤖 Starting async LLM analysis for ${articles.length} articles (rate limit: ${getLLMAnalysisRateLimit()})`);
+  console.log(`🤖 Starting async LLM analysis for ${articles.length} new articles`);
 
   const factExtractor = getFactExtractor();
   let analyzed = 0;
+  let failed = 0;
+
   for (const article of articles) {
-    try {
-      const analysis = await analyzer.llmAnalysis(article);
-      if (analysis) {
-        const updateData = {
-          bias: analysis.bias,
-          bias_score: analysis.bias_score,
-          sentiment_score: analysis.sentiment_score,
-          analysis_method: 'llm',
-          llm_confidence: analysis.llm_confidence,
-          llm_reasoning: analysis.llm_reasoning,
-          llm_indicators: JSON.stringify(analysis.indicators || []),
-        };
+    const result = await analyzeSingleArticle(article, analyzer, factExtractor);
+    if (result) analyzed++; else failed++;
+  }
 
-        // Run fact extraction
-        try {
-          const extraction = await factExtractor.extractFromArticle({
-            ...article,
-            id: article.id
-          });
-          if (extraction) {
-            updateData.llm_facts = JSON.stringify(extraction.facts || []);
-            // Entities are saved to the entities table by the fact extractor itself
-          }
-        } catch (factErr) {
-          console.error(`  ⚠️ Fact extraction failed for article ${article.id}:`, factErr.message);
-        }
-
-        Article.update(article.id, updateData);
-        analyzed++;
-        console.log(`  ✅ LLM analyzed: "${article.title.substring(0, 50)}..." → bias: ${analysis.bias_score}, confidence: ${analysis.llm_confidence || 'N/A'}`);
-      }
-    } catch (err) {
-      console.error(`  ❌ LLM analysis failed for article ${article.id}:`, err.message);
+  // Retry previously failed articles
+  const maxRetries = 3;
+  const retryArticles = Article.getFailedLLM(20, maxRetries);
+  let retried = 0;
+  if (retryArticles.length > 0) {
+    console.log(`🔄 Retrying ${retryArticles.length} previously failed articles (max ${maxRetries} retries)`);
+    for (const article of retryArticles) {
+      const result = await analyzeSingleArticle(article, analyzer, factExtractor);
+      if (result) retried++;
     }
   }
 
-  console.log(`🤖 Async LLM analysis complete: ${analyzed}/${articles.length} articles analyzed`);
+  console.log(`🤖 LLM analysis complete: ${analyzed} new, ${failed} failed, ${retried} retried successfully`);
+}
+
+async function analyzeSingleArticle(article, analyzer, factExtractor) {
+  try {
+    const analysis = await analyzer.llmAnalysis(article);
+
+    if (!analysis || analysis._failed) {
+      const retryCount = (article.llm_retry_count || 0) + 1;
+      const maxRetries = 3;
+      Article.update(article.id, {
+        analysis_method: retryCount >= maxRetries ? 'llm_skipped' : 'llm_failed',
+        llm_retry_count: retryCount,
+        llm_reasoning: analysis?.reason || 'Analysis failed',
+      });
+      console.log(`  ❌ LLM failed for "${article.title?.substring(0, 50)}..." (retry ${retryCount}/${maxRetries})`);
+      return false;
+    }
+
+    const updateData = {
+      bias: analysis.bias,
+      bias_score: analysis.bias_score,
+      sentiment_score: analysis.sentiment_score,
+      analysis_method: 'llm',
+      llm_confidence: analysis.llm_confidence,
+      llm_reasoning: analysis.llm_reasoning,
+      llm_indicators: JSON.stringify(analysis.indicators || []),
+      llm_retry_count: article.llm_retry_count || 0,
+    };
+
+    // Run fact extraction
+    try {
+      const extraction = await factExtractor.extractFromArticle({
+        ...article,
+        id: article.id
+      });
+      if (extraction) {
+        updateData.llm_facts = JSON.stringify(extraction.facts || []);
+      }
+    } catch (factErr) {
+      console.error(`  ⚠️ Fact extraction failed for article ${article.id}:`, factErr.message);
+    }
+
+    Article.update(article.id, updateData);
+    console.log(`  ✅ LLM analyzed: "${article.title?.substring(0, 50)}..." → bias: ${analysis.bias_score}, confidence: ${analysis.llm_confidence || 'N/A'}`);
+    return true;
+  } catch (err) {
+    const retryCount = (article.llm_retry_count || 0) + 1;
+    Article.update(article.id, {
+      analysis_method: retryCount >= 3 ? 'llm_skipped' : 'llm_failed',
+      llm_retry_count: retryCount,
+      llm_reasoning: err.message,
+    });
+    console.error(`  ❌ LLM error for article ${article.id}:`, err.message);
+    return false;
+  }
 }
 
 function extractImageUrl(item) {
