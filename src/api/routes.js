@@ -515,7 +515,9 @@ export async function registerRoutes(fastify) {
     }
   });
 
-  fastify.post('/api/ingest', async (request, reply) => {
+  fastify.post('/api/ingest', {
+    preHandler: [requireInteractiveMode]
+  }, async (request, reply) => {
     const { source_id } = request.body || {};
 
     try {
