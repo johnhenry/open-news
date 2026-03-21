@@ -102,12 +102,14 @@ export async function registerSettingsRoutes(fastify) {
         case 'ollama':
           try {
             const ollamaUrl = process.env.OLLAMA_BASE_URL || process.env.OLLAMA_HOST || 'http://localhost:11434';
+            const isRemoteOllama = !ollamaUrl.includes('localhost') && !ollamaUrl.includes('127.0.0.1');
+            const ollamaLabel = isRemoteOllama ? new URL(ollamaUrl).hostname : 'local';
             const ollamaResponse = await fetch(`${ollamaUrl}/api/tags`);
             if (ollamaResponse.ok) {
               const data = await ollamaResponse.json();
               models = (data.models || []).map(m => ({
                 id: m.name,
-                name: m.name,
+                name: `${m.name} (${ollamaLabel})`,
                 size: m.size ? `${(m.size / 1024 / 1024 / 1024).toFixed(1)}GB` : undefined
               }));
             }
@@ -119,6 +121,8 @@ export async function registerSettingsRoutes(fastify) {
         case 'openai':
           try {
             const openaiUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+            const openaiHost = new URL(openaiUrl).hostname;
+            const openaiLabel = openaiHost === 'api.openai.com' ? 'OpenAI' : openaiHost.replace('api.', '').split('.')[0];
             const openaiKey = process.env.OPENAI_API_KEY || '';
             const openaiResponse = await fetch(`${openaiUrl}/models`, {
               headers: openaiKey ? { 'Authorization': `Bearer ${openaiKey}` } : {}
@@ -127,7 +131,7 @@ export async function registerSettingsRoutes(fastify) {
               const data = await openaiResponse.json();
               models = (data.data || []).map(m => ({
                 id: m.id,
-                name: m.id
+                name: `${m.id} (${openaiLabel})`
               }));
             }
           } catch (e) {
