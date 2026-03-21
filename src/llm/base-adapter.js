@@ -13,12 +13,14 @@ export class BaseLLMAdapter {
   }
 
   async detectBias(articleText) {
-    const prompt = this.config.prompts.bias_detection.replace('{article}', articleText);
-    
+    // Truncate article to avoid overwhelming the model
+    const truncated = articleText.length > 3000 ? articleText.substring(0, 3000) + '...' : articleText;
+    const prompt = this.config.prompts.bias_detection.replace('{article}', truncated);
+
     try {
       const response = await this.complete(prompt, {
         temperature: 0.3,
-        max_tokens: 500
+        max_tokens: 1000
       });
       
       return this.parseJSONResponse(response);
@@ -109,35 +111,86 @@ export class BaseLLMAdapter {
   }
 
   parseJSONResponse(text) {
-    try {
-      // Try to extract JSON from the response
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        let jsonText = jsonMatch[0];
-        
-        // Fix common LLM JSON errors
-        // Add missing comma after "reasoning" field
-        jsonText = jsonText.replace(/"reasoning":\s*"[^"]*"\s*"indicators"/, (match) => {
-          return match.replace('"indicators"', ',"indicators"');
-        });
-        
-        return JSON.parse(jsonText);
-      }
-      
-      // If no JSON found, try to parse the entire response
-      return JSON.parse(text);
-    } catch (error) {
-      console.error('Failed to parse JSON response:', error);
-      console.error('Raw response:', text);
-      
-      // Fallback: return a default response to avoid breaking the system
-      return {
-        bias_score: 0,
-        confidence: 0.5,
-        reasoning: "Failed to parse LLM response",
-        indicators: []
-      };
+    if (!text || typeof text !== 'string') {
+      return this._fallbackResponse('Empty LLM response');
     }
+
+    // Strip markdown code fences (```json ... ``` or ``` ... ```)
+    let cleaned = text.replace(/```(?:json)?\s*\n?/gi, '').replace(/```\s*$/g, '').trim();
+
+    // Try to extract the outermost JSON object
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return this._fallbackResponse('No JSON object found in response');
+    }
+
+    let jsonText = jsonMatch[0];
+
+    // Fix common LLM JSON errors
+    // 1. Trailing commas before } or ]
+    jsonText = jsonText.replace(/,\s*([}\]])/g, '$1');
+    // 2. Missing commas between fields
+    jsonText = jsonText.replace(/"\s*\n\s*"/g, '",\n"');
+    jsonText = jsonText.replace(/(\d)\s*\n\s*"/g, '$1,\n"');
+    jsonText = jsonText.replace(/(true|false|null)\s*\n\s*"/g, '$1,\n"');
+    jsonText = jsonText.replace(/\]\s*\n\s*"/g, '],\n"');
+    // 3. Single quotes to double quotes (but not inside strings)
+    jsonText = jsonText.replace(/'/g, '"');
+
+    // Try parsing with fixes
+    try {
+      return JSON.parse(jsonText);
+    } catch (e1) {
+      // Try truncated JSON recovery — close any open strings, arrays, objects
+      try {
+        let fixed = jsonText;
+        // Count open brackets/braces
+        const openBraces = (fixed.match(/{/g) || []).length;
+        const closeBraces = (fixed.match(/}/g) || []).length;
+        const openBrackets = (fixed.match(/\[/g) || []).length;
+        const closeBrackets = (fixed.match(/\]/g) || []).length;
+
+        // Close any unclosed string
+        const quoteCount = (fixed.match(/"/g) || []).length;
+        if (quoteCount % 2 !== 0) {
+          fixed += '"';
+        }
+
+        // Close arrays then objects
+        for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += ']';
+        for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}';
+
+        // Remove trailing comma before closing
+        fixed = fixed.replace(/,\s*([}\]])/g, '$1');
+
+        return JSON.parse(fixed);
+      } catch (e2) {
+        // Last resort: try to extract individual fields with regex
+        const bias_score = text.match(/"bias_score"\s*:\s*(-?[\d.]+)/);
+        const confidence = text.match(/"confidence"\s*:\s*([\d.]+)/);
+        const reasoning = text.match(/"reasoning"\s*:\s*"([^"]*)/);
+
+        if (bias_score) {
+          return {
+            bias_score: parseFloat(bias_score[1]),
+            confidence: confidence ? parseFloat(confidence[1]) : 0.5,
+            reasoning: reasoning ? reasoning[1] : 'Partial parse recovery',
+            indicators: []
+          };
+        }
+
+        return this._fallbackResponse('Failed to parse LLM response');
+      }
+    }
+  }
+
+  _fallbackResponse(reason) {
+    return {
+      bias_score: 0,
+      confidence: 0,
+      reasoning: reason,
+      indicators: []
+    };
   }
 
   async testConnection() {
