@@ -79,8 +79,8 @@ function Dashboard() {
   const [sortBy, setSortBy] = useState('most_covered');
   const [searchParams, setSearchParams] = useState({});
   const [newArticleCount, setNewArticleCount] = useState(0);
-  const [showActivity, setShowActivity] = useState(false);
-  const [storyLimit, setStoryLimit] = useState(10);
+  const [storyPage, setStoryPage] = useState(0);
+  const [storyPageSize, setStoryPageSize] = useState(10);
   const prevArticleCount = useRef(null);
   const pollIntervalRef = useRef(null);
 
@@ -176,6 +176,7 @@ function Dashboard() {
   }
 
   function handleSearch(params) {
+    setStoryPage(0);
     setSearchParams(prev => {
       const prevStr = JSON.stringify(prev);
       const nextStr = JSON.stringify(params);
@@ -217,7 +218,8 @@ function Dashboard() {
   }
 
   const sortedClusters = sortClusters(filteredClusters, sortBy);
-  const displayedClusters = sortedClusters.slice(0, storyLimit);
+  const storyTotalPages = Math.max(1, Math.ceil(sortedClusters.length / storyPageSize));
+  const displayedClusters = sortedClusters.slice(storyPage * storyPageSize, (storyPage + 1) * storyPageSize);
 
   const totalArticles = dataStats?.articles ?? stats.total_articles;
   const totalClusters = dataStats?.clusters ?? stats.total_clusters;
@@ -333,23 +335,14 @@ function Dashboard() {
       <div className="dashboard__sort-row">
         <h2 className="dashboard__section-title">
           Top Stories
-          <span className="dashboard__cluster-count">{displayedClusters.length}{sortedClusters.length > storyLimit ? ` of ${sortedClusters.length}` : ''}</span>
+          <span className="dashboard__cluster-count">{sortedClusters.length}</span>
         </h2>
         <div className="dashboard__sort-controls">
-          <select
-            value={storyLimit}
-            onChange={e => setStoryLimit(Number(e.target.value))}
-            style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px', marginRight: '8px' }}
-          >
-            {[10, 20, 50].map(n => (
-              <option key={n} value={n}>Show {n}</option>
-            ))}
-          </select>
           {SORT_OPTIONS.map(opt => (
             <button
               key={opt.key}
               className={`dashboard__sort-btn ${sortBy === opt.key ? 'dashboard__sort-btn--active' : ''}`}
-              onClick={() => setSortBy(opt.key)}
+              onClick={() => { setSortBy(opt.key); setStoryPage(0); }}
             >
               {opt.label}
             </button>
@@ -374,24 +367,52 @@ function Dashboard() {
         )}
       </div>
 
+      {/* Story Pagination */}
+      {sortedClusters.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+            Showing {storyPage * storyPageSize + 1}-{Math.min((storyPage + 1) * storyPageSize, sortedClusters.length)} of {sortedClusters.length}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <select
+              value={storyPageSize}
+              onChange={e => { setStoryPageSize(Number(e.target.value)); setStoryPage(0); }}
+              style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+            >
+              {[10, 25, 50].map(n => (
+                <option key={n} value={n}>{n} per page</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setStoryPage(p => Math.max(0, p - 1))}
+              disabled={storyPage === 0}
+              style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #d1d5db', background: storyPage === 0 ? '#f3f4f6' : '#fff', cursor: storyPage === 0 ? 'default' : 'pointer', fontSize: '14px' }}
+            >
+              Previous
+            </button>
+            <span style={{ fontSize: '14px', color: '#374151' }}>
+              Page {storyPage + 1} of {storyTotalPages}
+            </span>
+            <button
+              onClick={() => setStoryPage(p => Math.min(storyTotalPages - 1, p + 1))}
+              disabled={storyPage >= storyTotalPages - 1}
+              style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #d1d5db', background: storyPage >= storyTotalPages - 1 ? '#f3f4f6' : '#fff', cursor: storyPage >= storyTotalPages - 1 ? 'default' : 'pointer', fontSize: '14px' }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Blindspot / Coverage Gap Section */}
       <BlindspotSection />
 
-      {/* Activity Log (collapsible) */}
+      {/* Activity Log */}
       {(ingestionLogs.length > 0 || clusteringJob) && (
         <div className="card">
-          <div
-            className="dashboard__activity-header"
-            onClick={() => setShowActivity(!showActivity)}
-            style={{ cursor: 'pointer' }}
-          >
+          <div className="dashboard__activity-header">
             <h2>Recent Activity</h2>
-            <span className="dashboard__activity-toggle">
-              {showActivity ? 'Hide' : 'Show'}
-            </span>
           </div>
-          {showActivity && (
-            <>
               <p className="section-hint">
                 Latest ingestion and clustering results.
               </p>
@@ -441,8 +462,6 @@ function Dashboard() {
                   </div>
                 ))}
               </div>
-            </>
-          )}
         </div>
       )}
     </div>
