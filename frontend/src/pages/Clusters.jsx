@@ -13,28 +13,6 @@ function Clusters() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
-  const [interactive, setInteractive] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
-
-  useEffect(() => {
-    newsAPI.getSettingsMode().then(m => setInteractive(m.interactive)).catch(() => {});
-  }, []);
-
-  async function handleDeleteCluster(clusterId, e) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!window.confirm('Delete this cluster?')) return;
-    try {
-      setDeletingId(clusterId);
-      await newsAPI.deleteCluster(clusterId);
-      setClusters(prev => prev.filter(c => c.id !== clusterId));
-      setTotalCount(prev => prev - 1);
-    } catch (err) {
-      alert(`Failed to delete: ${err.message}`);
-    } finally {
-      setDeletingId(null);
-    }
-  }
 
   const loadClusters = useCallback(async (signal, currentPage, currentPageSize) => {
     try {
@@ -105,21 +83,6 @@ function Clusters() {
                 articles={cluster.articles || []}
               />
             </Link>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f3f4f6' }}>
-              <button
-                onClick={(e) => handleDeleteCluster(cluster.id, e)}
-                disabled={!interactive || deletingId === cluster.id}
-                style={{
-                  padding: '4px 10px', borderRadius: '6px', fontSize: '12px',
-                  cursor: (!interactive || deletingId === cluster.id) ? 'not-allowed' : 'pointer',
-                  border: '1px solid #fca5a5', background: '#fef2f2', color: '#991b1b',
-                  opacity: (!interactive || deletingId === cluster.id) ? 0.45 : 1,
-                  filter: !interactive ? 'grayscale(40%)' : 'none',
-                }}
-              >
-                {deletingId === cluster.id ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
           </div>
         ))}
       </div>

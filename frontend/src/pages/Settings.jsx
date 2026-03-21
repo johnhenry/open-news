@@ -918,11 +918,10 @@ function Settings() {
               </div>
             </div>
 
-            {!readOnly && (
             <div className="action-buttons" style={{marginTop: '2rem'}}>
               <button
                 onClick={clearClusters}
-                disabled={clearingClusters}
+                disabled={readOnly || clearingClusters}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               >
                 {clearingClusters ? (
@@ -935,7 +934,6 @@ function Settings() {
                 )}
               </button>
             </div>
-            )}
           </div>
         )}
 

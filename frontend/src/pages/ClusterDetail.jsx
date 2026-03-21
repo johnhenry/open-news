@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import BiasSpectrum from '../components/BiasSpectrum';
@@ -23,32 +23,27 @@ const BIAS_LABELS = {
 
 function ClusterDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [cluster, setCluster] = useState(null);
   const [comparison, setComparison] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState('framing');
-  const [interactive, setInteractive] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const loadClusterDetail = useCallback(async (signal) => {
     try {
       setLoading(true);
       setError(null);
 
-      const [clusterData, comparisonData, modeData] = await Promise.all([
+      const [clusterData, comparisonData] = await Promise.all([
         newsAPI.getCluster(id, { signal }),
         newsAPI.getClusterComparison(id, { signal }),
-        newsAPI.getSettingsMode().catch(() => ({ interactive: false })),
       ]);
 
       if (signal?.aborted) return;
 
       setCluster(clusterData);
       setComparison(comparisonData);
-      setInteractive(modeData.interactive);
     } catch (err) {
       if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       setError(err.message);
@@ -105,18 +100,6 @@ function ClusterDetail() {
     }
   }
 
-  async function handleDelete() {
-    if (!window.confirm('Delete this cluster? Articles will become unclustered and may be re-clustered later.')) return;
-    try {
-      setDeleting(true);
-      await newsAPI.deleteCluster(id);
-      navigate('/clusters');
-    } catch (err) {
-      alert(`Failed to delete: ${err.message}`);
-      setDeleting(false);
-    }
-  }
-
   if (loading) return <LoadingSpinner text="Loading cluster details..." />;
   if (error) return <div className="error">Error: {error}</div>;
   if (!cluster || !comparison) return null;
@@ -142,30 +125,14 @@ function ClusterDetail() {
         <Link to="/clusters" className="cluster-detail__back">
           &larr; Back to Clusters
         </Link>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="cluster-detail__share-btn" onClick={handleShare}>
-            {copied ? 'Copied!' : 'Share'}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '4px' }}>
-              <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
-              <polyline points="16 6 12 2 8 6" />
-              <line x1="12" y1="2" x2="12" y2="15" />
-            </svg>
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={!interactive || deleting}
-            style={{
-              padding: '6px 12px', borderRadius: '8px', fontSize: '13px',
-              cursor: (!interactive || deleting) ? 'not-allowed' : 'pointer',
-              border: '1px solid #fca5a5', background: '#fef2f2', color: '#991b1b',
-              opacity: (!interactive || deleting) ? 0.45 : 1,
-              filter: !interactive ? 'grayscale(40%)' : 'none',
-              display: 'flex', alignItems: 'center', gap: '4px',
-            }}
-          >
-            {deleting ? 'Deleting...' : 'Delete'}
-          </button>
-        </div>
+        <button className="cluster-detail__share-btn" onClick={handleShare}>
+          {copied ? 'Copied!' : 'Share'}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '4px' }}>
+            <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
+            <polyline points="16 6 12 2 8 6" />
+            <line x1="12" y1="2" x2="12" y2="15" />
+          </svg>
+        </button>
       </div>
 
       <h1>{cluster.title}</h1>
