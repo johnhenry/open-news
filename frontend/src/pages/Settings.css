@@ -895,15 +895,17 @@
   opacity: 0.4;
 }
 
-.adapter-card button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  pointer-events: none;
-  filter: grayscale(40%);
+.adapter-card button:disabled,
+.adapter-card .button:disabled,
+.adapter-card .button.primary:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  filter: grayscale(40%) !important;
 }
 
 .adapter-card select:disabled {
-  opacity: 0.55;
-  background-color: #f3f4f6;
+  opacity: 0.55 !important;
+  background-color: #f3f4f6 !important;
   color: #9ca3af;
 }

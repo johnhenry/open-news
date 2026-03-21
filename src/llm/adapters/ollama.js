@@ -8,20 +8,33 @@ export class OllamaAdapter extends BaseLLMAdapter {
     this.baseUrl = config.adapters.ollama.base_url;
     this.model = config.adapters.ollama.model;
     this.options = config.adapters.ollama.options;
+    // Support auth for Ollama Cloud
+    this.apiKey = process.env.OLLAMA_API_KEY || process.env.OPENAI_API_KEY || '';
+  }
+
+  _getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    if (this.apiKey) {
+      headers['Authorization'] = `Bearer ${this.apiKey}`;
+    }
+    return headers;
   }
 
   async initialize() {
     try {
-      const response = await fetch(`${this.baseUrl}/api/tags`);
+      const response = await fetch(`${this.baseUrl}/api/tags`, {
+        headers: this._getHeaders()
+      });
       if (!response.ok) {
         throw new Error(`Ollama not available at ${this.baseUrl}`);
       }
-      
+
       const data = await response.json();
       const models = data.models || [];
-      
-      console.log(`✅ Ollama connected. Available models: ${models.map(m => m.name).join(', ')}`);
-      
+
+      const isCloud = !this.baseUrl.includes('localhost') && !this.baseUrl.includes('127.0.0.1');
+      console.log(`✅ Ollama${isCloud ? ' Cloud' : ''} connected. Available models: ${models.map(m => m.name).join(', ')}`);
+
       // Check if the configured model exists
       const modelExists = models.some(m => m.name === this.model);
       if (!modelExists && models.length > 0) {
@@ -30,7 +43,7 @@ export class OllamaAdapter extends BaseLLMAdapter {
         this.model = models[0].name;
         console.log(`📝 Using ${this.model} as fallback`);
       }
-      
+
       return true;
     } catch (error) {
       console.error('Failed to initialize Ollama:', error.message);
@@ -54,9 +67,7 @@ export class OllamaAdapter extends BaseLLMAdapter {
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: this._getHeaders(),
         body: JSON.stringify(requestBody)
       });
 
@@ -89,9 +100,7 @@ export class OllamaAdapter extends BaseLLMAdapter {
     try {
       const response = await fetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: this._getHeaders(),
         body: JSON.stringify(requestBody)
       });
 
@@ -110,13 +119,11 @@ export class OllamaAdapter extends BaseLLMAdapter {
 
   async pullModel(modelName) {
     console.log(`📥 Pulling Ollama model: ${modelName}`);
-    
+
     try {
       const response = await fetch(`${this.baseUrl}/api/pull`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: this._getHeaders(),
         body: JSON.stringify({
           name: modelName,
           stream: false
@@ -141,9 +148,7 @@ export class OllamaAdapter extends BaseLLMAdapter {
     try {
       const response = await fetch(`${this.baseUrl}/api/show`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: this._getHeaders(),
         body: JSON.stringify({ name: this.model })
       });
 
@@ -151,7 +156,7 @@ export class OllamaAdapter extends BaseLLMAdapter {
         console.log(`Model ${this.model} not found. Pulling...`);
         await this.pullModel(this.model);
       }
-      
+
       return true;
     } catch (error) {
       console.error('Failed to ensure model:', error);

@@ -102,9 +102,12 @@ export async function registerSettingsRoutes(fastify) {
         case 'ollama':
           try {
             const ollamaUrl = process.env.OLLAMA_BASE_URL || process.env.OLLAMA_HOST || 'http://localhost:11434';
+            const ollamaKey = process.env.OLLAMA_API_KEY || process.env.OPENAI_API_KEY || '';
             const isRemoteOllama = !ollamaUrl.includes('localhost') && !ollamaUrl.includes('127.0.0.1');
-            const ollamaLabel = isRemoteOllama ? new URL(ollamaUrl).hostname : 'local';
-            const ollamaResponse = await fetch(`${ollamaUrl}/api/tags`);
+            const ollamaLabel = isRemoteOllama ? 'Ollama Cloud' : 'local';
+            const ollamaHeaders = { 'Content-Type': 'application/json' };
+            if (ollamaKey) ollamaHeaders['Authorization'] = `Bearer ${ollamaKey}`;
+            const ollamaResponse = await fetch(`${ollamaUrl}/api/tags`, { headers: ollamaHeaders });
             if (ollamaResponse.ok) {
               const data = await ollamaResponse.json();
               models = (data.models || []).map(m => ({
