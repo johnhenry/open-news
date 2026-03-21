@@ -6,6 +6,114 @@ import { format } from 'date-fns';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
+function LLMAnalysisPanel({ article }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const hasLLMData = article.analysis_method === 'llm' && (
+    article.llm_confidence != null || article.llm_reasoning || article.llm_indicators || article.llm_facts
+  );
+
+  if (!hasLLMData) return null;
+
+  const indicators = (() => {
+    try { return JSON.parse(article.llm_indicators || '[]'); } catch { return []; }
+  })();
+  const facts = (() => {
+    try { return JSON.parse(article.llm_facts || '[]'); } catch { return []; }
+  })();
+
+  const confidencePct = article.llm_confidence != null ? Math.round(article.llm_confidence * 100) : null;
+
+  return (
+    <div style={{ marginTop: '10px' }}>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          background: 'none', border: '1px solid #e5e7eb', borderRadius: '6px',
+          padding: '4px 10px', fontSize: '12px', color: '#7c3aed', cursor: 'pointer',
+          fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px'
+        }}
+      >
+        AI Analysis {expanded ? '\u25B4' : '\u25BE'}
+      </button>
+
+      {expanded && (
+        <div style={{
+          marginTop: '8px', padding: '12px', background: '#faf5ff', borderRadius: '8px',
+          border: '1px solid #e9d5ff', fontSize: '13px'
+        }}>
+          {/* Confidence */}
+          {confidencePct != null && (
+            <div style={{ marginBottom: '10px' }}>
+              <span style={{ fontWeight: 600, color: '#6b21a8', fontSize: '12px' }}>Confidence</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <div style={{
+                  flex: 1, height: '6px', background: '#e9d5ff', borderRadius: '3px', maxWidth: '200px'
+                }}>
+                  <div style={{
+                    width: `${confidencePct}%`, height: '100%', borderRadius: '3px',
+                    background: confidencePct > 70 ? '#7c3aed' : confidencePct > 40 ? '#a78bfa' : '#c4b5fd'
+                  }} />
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#7c3aed' }}>{confidencePct}%</span>
+              </div>
+            </div>
+          )}
+
+          {/* Reasoning */}
+          {article.llm_reasoning && (
+            <div style={{ marginBottom: '10px' }}>
+              <span style={{ fontWeight: 600, color: '#6b21a8', fontSize: '12px' }}>Reasoning</span>
+              <p style={{ margin: '4px 0 0', color: '#4b5563', lineHeight: 1.5 }}>{article.llm_reasoning}</p>
+            </div>
+          )}
+
+          {/* Indicators */}
+          {indicators.length > 0 && (
+            <div style={{ marginBottom: '10px' }}>
+              <span style={{ fontWeight: 600, color: '#6b21a8', fontSize: '12px' }}>Bias Indicators</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                {indicators.map((ind, i) => (
+                  <span key={i} style={{
+                    display: 'inline-block', padding: '2px 8px', borderRadius: '12px',
+                    fontSize: '11px', background: '#ede9fe', color: '#7c3aed', border: '1px solid #c4b5fd'
+                  }}>
+                    {typeof ind === 'string' ? ind : ind.label || ind.indicator || JSON.stringify(ind)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Facts */}
+          {facts.length > 0 && (
+            <div>
+              <span style={{ fontWeight: 600, color: '#6b21a8', fontSize: '12px' }}>Extracted Facts</span>
+              <ul style={{ margin: '4px 0 0', paddingLeft: '16px', color: '#4b5563', lineHeight: 1.6 }}>
+                {facts.map((fact, i) => (
+                  <li key={i} style={{ marginBottom: '2px' }}>
+                    {fact.type && (
+                      <span style={{
+                        display: 'inline-block', padding: '1px 6px', borderRadius: '8px',
+                        fontSize: '10px', fontWeight: 600, marginRight: '6px',
+                        background: fact.type === 'statistic' ? '#dbeafe' : fact.type === 'quote' ? '#fef3c7' : fact.type === 'event' ? '#d1fae5' : '#f3f4f6',
+                        color: fact.type === 'statistic' ? '#1d4ed8' : fact.type === 'quote' ? '#92400e' : fact.type === 'event' ? '#065f46' : '#374151'
+                      }}>
+                        {fact.type}
+                      </span>
+                    )}
+                    {fact.claim || (typeof fact === 'string' ? fact : JSON.stringify(fact))}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Articles() {
   const [articles, setArticles] = useState([]);
   const [sources, setSources] = useState([]);
@@ -146,6 +254,8 @@ function Articles() {
                 <span>{format(new Date(article.published_at), 'MMM d, yyyy h:mm a')}</span>
               )}
             </div>
+
+            <LLMAnalysisPanel article={article} />
           </div>
         ))}
       </div>

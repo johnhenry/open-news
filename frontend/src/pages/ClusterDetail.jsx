@@ -119,6 +119,13 @@ function ClusterDetail() {
   const totalSources = new Set(allArticles.map(a => a.source_name)).size;
   const biasesPresent = biasOrder.filter(b => (comparison.comparisons[b] || []).length > 0);
 
+  // LLM analysis summary for cluster
+  const llmArticles = allArticles.filter(a => a.analysis_method === 'llm');
+  const llmCount = llmArticles.length;
+  const avgConfidence = llmCount > 0
+    ? llmArticles.reduce((sum, a) => sum + (a.llm_confidence || 0), 0) / llmCount
+    : 0;
+
   return (
     <div className="cluster-detail">
       <div className="cluster-detail__nav">
@@ -144,6 +151,23 @@ function ClusterDetail() {
         <div className="card" style={{ background: '#eff6ff', borderLeft: '4px solid #2563eb', marginBottom: '24px' }}>
           <h3 style={{ marginBottom: '8px', fontSize: '15px' }}>Key Facts</h3>
           <p style={{ margin: 0, lineHeight: 1.6 }}>{cluster.fact_core}</p>
+        </div>
+      )}
+
+      {/* LLM Analysis Summary */}
+      {llmCount > 0 && (
+        <div className="card" style={{
+          background: '#faf5ff', borderLeft: '4px solid #7c3aed', marginBottom: '24px',
+          display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 20px'
+        }}>
+          <span style={{
+            display: 'inline-block', padding: '3px 8px', borderRadius: '10px',
+            fontSize: '11px', fontWeight: 600, background: '#ede9fe', color: '#7c3aed',
+            border: '1px solid #c4b5fd'
+          }}>AI</span>
+          <span style={{ fontSize: '14px', color: '#4b5563' }}>
+            {llmCount} of {allArticles.length} article{allArticles.length !== 1 ? 's' : ''} AI-analyzed, average confidence: {Math.round(avgConfidence * 100)}%
+          </span>
         </div>
       )}
 

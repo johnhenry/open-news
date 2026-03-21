@@ -282,6 +282,17 @@ export const newsAPI = {
     }
   },
 
+  async searchEntities(params = {}, options = {}) {
+    try {
+      const response = await api.get('/entities', { params, signal: options.signal });
+      return response.data;
+    } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') throw err;
+      console.warn('Entity search API not available');
+      return { articles: [], total: 0 };
+    }
+  },
+
   async getClusterHeadlines(id, options = {}) {
     try {
       const response = await api.get(`/clusters/${id}/headlines`, { signal: options.signal });

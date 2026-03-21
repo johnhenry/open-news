@@ -52,6 +52,27 @@ function migrate() {
       }
     }
 
+    // Add LLM analysis columns to articles
+    const llmColumns = [
+      { name: 'llm_confidence', sql: 'ALTER TABLE articles ADD COLUMN llm_confidence REAL' },
+      { name: 'llm_reasoning', sql: 'ALTER TABLE articles ADD COLUMN llm_reasoning TEXT' },
+      { name: 'llm_indicators', sql: 'ALTER TABLE articles ADD COLUMN llm_indicators TEXT' },
+      { name: 'llm_facts', sql: 'ALTER TABLE articles ADD COLUMN llm_facts TEXT' },
+    ];
+
+    for (const col of llmColumns) {
+      try {
+        db.exec(col.sql);
+        console.log(`  Added ${col.name} column to articles`);
+      } catch (err) {
+        if (!err.message.includes('duplicate column') && !err.message.includes('already exists')) {
+          if (!err.message.includes('column') || !err.message.includes(col.name)) {
+            console.warn(`Warning adding ${col.name} column:`, err.message);
+          }
+        }
+      }
+    }
+
     console.log('✅ Database migration completed successfully');
   } catch (error) {
     console.error('❌ Database migration failed:', error);

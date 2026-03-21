@@ -149,7 +149,8 @@ class ArticleAnalyzer {
           sentiment_score: biasResult.sentiment_score || 0,
           analysis_method: 'llm',
           llm_confidence: biasResult.confidence || null,
-          llm_reasoning: biasResult.reasoning || null
+          llm_reasoning: biasResult.reasoning || null,
+          indicators: biasResult.indicators || []
         };
       }
       

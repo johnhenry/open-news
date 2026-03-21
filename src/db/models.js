@@ -2,7 +2,7 @@ import db from './database.js';
 
 // Field whitelists for safe updates
 const ALLOWED_SOURCE_FIELDS = ['name', 'url', 'rss_url', 'api_url', 'bias', 'bias_score', 'scraping_enabled', 'active', 'notes'];
-const ALLOWED_ARTICLE_FIELDS = ['title', 'excerpt', 'content', 'image_url', 'bias', 'bias_score', 'sentiment_score', 'analysis_method'];
+const ALLOWED_ARTICLE_FIELDS = ['title', 'excerpt', 'content', 'image_url', 'bias', 'bias_score', 'sentiment_score', 'analysis_method', 'llm_confidence', 'llm_reasoning', 'llm_indicators', 'llm_facts'];
 
 /**
  * Filter object to only include allowed fields
@@ -439,6 +439,43 @@ export const Entity = {
     });
 
     return transaction(entities);
+  },
+
+  search({ q, type, limit = 50, offset = 0 }) {
+    const conditions = [];
+    const params = [];
+
+    if (q) {
+      conditions.push('e.entity_value LIKE ?');
+      params.push(`%${q}%`);
+    }
+
+    if (type) {
+      conditions.push('e.entity_type = ?');
+      params.push(type);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const total = db.prepare(`
+      SELECT COUNT(DISTINCT a.id) as total
+      FROM entities e
+      JOIN articles a ON e.article_id = a.id
+      ${whereClause}
+    `).get(...params).total;
+
+    const articles = db.prepare(`
+      SELECT DISTINCT a.*, s.name as source_name, s.bias as source_bias,
+        e.entity_value as matched_entity, e.entity_type as matched_entity_type
+      FROM entities e
+      JOIN articles a ON e.article_id = a.id
+      JOIN sources s ON a.source_id = s.id
+      ${whereClause}
+      ORDER BY a.published_at DESC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset);
+
+    return { articles, total };
   }
 };
 

@@ -1,4 +1,4 @@
-import { Article, Cluster, Source, IngestionLog } from '../db/models.js';
+import { Article, Cluster, Source, Entity, IngestionLog } from '../db/models.js';
 import { calculateClusterBiasDistribution } from '../bias/classifier.js';
 import { fetchRSSFeed } from '../ingestion/rss-parser.js';
 import {
@@ -590,6 +590,45 @@ export async function registerRoutes(fastify) {
       logs,
       total: logs.length
     };
+  });
+
+  // ===== Entity Search =====
+
+  fastify.get('/api/entities', async (request, reply) => {
+    const { q, type, limit = 50, offset = 0 } = request.query;
+
+    if (!q && !type) {
+      return reply.code(400).send(createErrorResponse(
+        'VALIDATION_ERROR',
+        'At least one of "q" or "type" query parameters is required'
+      ));
+    }
+
+    const safeLimit = Math.max(1, Math.min(parseInt(limit) || 50, ARTICLES.MAX_LIMIT));
+    const safeOffset = Math.max(0, parseInt(offset) || 0);
+
+    try {
+      const result = Entity.search({
+        q,
+        type,
+        limit: safeLimit,
+        offset: safeOffset
+      });
+
+      return {
+        articles: result.articles,
+        total: result.total,
+        limit: safeLimit,
+        offset: safeOffset
+      };
+    } catch (error) {
+      request.log.error({ err: error }, 'Entity search failed');
+      return reply.code(500).send(createErrorResponse(
+        'SEARCH_FAILED',
+        'Failed to search entities',
+        { detail: error.message }
+      ));
+    }
   });
 
   // ===== Search Endpoints =====

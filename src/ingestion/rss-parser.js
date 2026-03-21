@@ -2,6 +2,7 @@ import Parser from 'rss-parser';
 import { Article, IngestionLog } from '../db/models.js';
 import { extractContent } from './content-extractor.js';
 import { getArticleAnalyzer } from '../services/article-analyzer.js';
+import { getFactExtractor } from '../llm/fact-extractor.js';
 import { Settings } from '../db/settings-model.js';
 
 const parser = new Parser({
@@ -141,19 +142,39 @@ export async function fetchRSSFeed(source) {
 async function runAsyncLLMAnalysis(articles, analyzer, sourceDefaultBias) {
   console.log(`🤖 Starting async LLM analysis for ${articles.length} articles (rate limit: ${getLLMAnalysisRateLimit()})`);
 
+  const factExtractor = getFactExtractor();
   let analyzed = 0;
   for (const article of articles) {
     try {
       const analysis = await analyzer.llmAnalysis(article);
       if (analysis) {
-        Article.update(article.id, {
+        const updateData = {
           bias: analysis.bias,
           bias_score: analysis.bias_score,
           sentiment_score: analysis.sentiment_score,
-          analysis_method: 'llm'
-        });
+          analysis_method: 'llm',
+          llm_confidence: analysis.llm_confidence,
+          llm_reasoning: analysis.llm_reasoning,
+          llm_indicators: JSON.stringify(analysis.indicators || []),
+        };
+
+        // Run fact extraction
+        try {
+          const extraction = await factExtractor.extractFromArticle({
+            ...article,
+            id: article.id
+          });
+          if (extraction) {
+            updateData.llm_facts = JSON.stringify(extraction.facts || []);
+            // Entities are saved to the entities table by the fact extractor itself
+          }
+        } catch (factErr) {
+          console.error(`  ⚠️ Fact extraction failed for article ${article.id}:`, factErr.message);
+        }
+
+        Article.update(article.id, updateData);
         analyzed++;
-        console.log(`  ✅ LLM analyzed: "${article.title.substring(0, 50)}..." → bias: ${analysis.bias_score}`);
+        console.log(`  ✅ LLM analyzed: "${article.title.substring(0, 50)}..." → bias: ${analysis.bias_score}, confidence: ${analysis.llm_confidence || 'N/A'}`);
       }
     } catch (err) {
       console.error(`  ❌ LLM analysis failed for article ${article.id}:`, err.message);
