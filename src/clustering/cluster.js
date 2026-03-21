@@ -10,8 +10,11 @@ const { euclidean } = mlDistance;
 
 const TfIdf = natural.TfIdf;
 
-// Rate limit: max clusters to LLM-summarize per cycle
-const LLM_CLUSTER_SUMMARY_RATE_LIMIT = 10;
+// Rate limit: max clusters to LLM-summarize per cycle (-1 = unlimited)
+function getLLMClusterSummaryRateLimit() {
+  const val = parseInt(Settings.get('llm_cluster_summary_rate_limit') || process.env.getLLMClusterSummaryRateLimit() || '10');
+  return val === -1 ? Infinity : val;
+}
 
 export async function clusterArticles(articles) {
   if (articles.length < 2) {
@@ -60,7 +63,7 @@ export async function clusterArticles(articles) {
 
 /**
  * Generate LLM-powered summaries for newly created clusters.
- * Rate limited to LLM_CLUSTER_SUMMARY_RATE_LIMIT per cycle.
+ * Rate limited to getLLMClusterSummaryRateLimit() per cycle.
  * Skips clusters that already have LLM-generated summaries (non-generic ones).
  */
 async function generateLLMClusterSummaries(savedClusters) {
@@ -79,7 +82,7 @@ async function generateLLMClusterSummaries(savedClusters) {
   // Filter to clusters with 2+ articles that don't already have good summaries
   const clustersToSummarize = savedClusters
     .filter(c => c.articles >= 2 && c._articleData)
-    .slice(0, LLM_CLUSTER_SUMMARY_RATE_LIMIT);
+    .slice(0, getLLMClusterSummaryRateLimit());
 
   if (clustersToSummarize.length === 0) return;
 

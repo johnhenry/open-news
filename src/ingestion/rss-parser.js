@@ -14,8 +14,11 @@ const parser = new Parser({
   }
 });
 
-// Rate limit: max articles to LLM-analyze per ingestion cycle
-const LLM_ANALYSIS_RATE_LIMIT = 5;
+// Rate limit: max articles to LLM-analyze per ingestion cycle (-1 = unlimited)
+function getLLMAnalysisRateLimit() {
+  const val = parseInt(Settings.get('llm_analysis_rate_limit') || process.env.getLLMAnalysisRateLimit() || '5');
+  return val === -1 ? Infinity : val;
+}
 
 export async function fetchRSSFeed(source) {
   const results = {
@@ -85,7 +88,7 @@ export async function fetchRSSFeed(source) {
         });
 
         // Queue for async LLM analysis if conditions met
-        if (useLLM && contentMode === 'research' && articleData.content && articlesForLLMAnalysis.length < LLM_ANALYSIS_RATE_LIMIT) {
+        if (useLLM && contentMode === 'research' && articleData.content && articlesForLLMAnalysis.length < getLLMAnalysisRateLimit()) {
           articlesForLLMAnalysis.push({
             id: articleId,
             ...articleData
@@ -134,7 +137,7 @@ export async function fetchRSSFeed(source) {
  * Processes articles sequentially to avoid overwhelming the LLM.
  */
 async function runAsyncLLMAnalysis(articles, analyzer, sourceDefaultBias) {
-  console.log(`🤖 Starting async LLM analysis for ${articles.length} articles (rate limit: ${LLM_ANALYSIS_RATE_LIMIT})`);
+  console.log(`🤖 Starting async LLM analysis for ${articles.length} articles (rate limit: ${getLLMAnalysisRateLimit()})`);
 
   let analyzed = 0;
   for (const article of articles) {

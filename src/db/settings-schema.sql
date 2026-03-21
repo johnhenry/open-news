@@ -62,6 +62,8 @@ INSERT OR IGNORE INTO settings (key, value, type, category, description, default
   ('llm_confidence_threshold', '0.7', 'number', 'llm', 'Minimum confidence for LLM results', '0.7'),
   ('llm_cache_ttl', '86400', 'number', 'llm', 'Cache TTL in seconds', '86400'),
   ('analysis_method', 'source_default', 'string', 'llm', 'Article analysis method (source_default, keyword, llm)', 'source_default'),
+  ('llm_analysis_rate_limit', '-1', 'number', 'llm', 'Max articles to LLM-analyze per ingestion cycle (-1 = unlimited)', '-1'),
+  ('llm_cluster_summary_rate_limit', '-1', 'number', 'llm', 'Max clusters to LLM-summarize per cycle (-1 = unlimited)', '-1'),
   
   -- Ingestion Settings
   ('ingestion_enabled', 'true', 'boolean', 'ingestion', 'Enable automatic ingestion', 'true'),

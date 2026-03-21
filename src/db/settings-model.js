@@ -147,6 +147,8 @@ export class Settings {
       MIN_CLUSTER_SIZE: 'min_cluster_size',
       ANALYSIS_METHOD: 'analysis_method',
       LLM_CONFIDENCE_THRESHOLD: 'llm_confidence_threshold',
+      LLM_ANALYSIS_RATE_LIMIT: 'llm_analysis_rate_limit',
+      LLM_CLUSTER_SUMMARY_RATE_LIMIT: 'llm_cluster_summary_rate_limit',
       INGEST_INTERVAL: 'ingestion_interval',
       CLUSTER_INTERVAL: 'clustering_interval',
     };
