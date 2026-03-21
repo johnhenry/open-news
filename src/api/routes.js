@@ -9,6 +9,7 @@ import {
   createErrorResponse
 } from '../middleware/validation.js';
 import { ARTICLES, CLUSTERS, CACHE } from '../config/constants.js';
+import { requireInteractiveMode } from '../middleware/auth.js';
 
 // Simple in-memory cache for stats
 const statsCache = {
@@ -254,6 +255,21 @@ export async function registerRoutes(fastify) {
         'Failed to detect coverage blindspots',
         { detail: error.message }
       ));
+    }
+  });
+
+  // Delete a cluster (requires interactive mode)
+  fastify.delete('/api/clusters/:id', {
+    preHandler: [requireInteractiveMode],
+    schema: { params: idParamSchema }
+  }, async (request, reply) => {
+    const clusterId = parseInt(request.params.id);
+    try {
+      Cluster.delete(clusterId);
+      return { success: true };
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to delete cluster');
+      return reply.code(500).send(createErrorResponse('DELETE_FAILED', error.message));
     }
   });
 

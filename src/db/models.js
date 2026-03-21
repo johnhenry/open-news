@@ -258,6 +258,11 @@ export const Article = {
 };
 
 export const Cluster = {
+  delete(id) {
+    db.prepare('DELETE FROM article_clusters WHERE cluster_id = ?').run(id);
+    return db.prepare('DELETE FROM clusters WHERE id = ?').run(id);
+  },
+
   getCount() {
     return db.prepare('SELECT COUNT(*) as count FROM clusters').get().count;
   },

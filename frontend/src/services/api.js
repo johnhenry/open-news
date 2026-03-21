@@ -79,6 +79,11 @@ export const newsAPI = {
     return response.data;
   },
 
+  async deleteCluster(id) {
+    const response = await api.delete(`/clusters/${id}`);
+    return response.data;
+  },
+
   async getArticles(params = {}, options = {}) {
     const response = await api.get('/articles', { params, signal: options.signal });
     return response.data;
