@@ -151,19 +151,20 @@ function ClusterDetail() {
               <line x1="12" y1="2" x2="12" y2="15" />
             </svg>
           </button>
-          {interactive && (
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              style={{
-                padding: '6px 12px', borderRadius: '8px', fontSize: '13px', cursor: deleting ? 'not-allowed' : 'pointer',
-                border: '1px solid #fca5a5', background: '#fef2f2', color: '#991b1b',
-                opacity: deleting ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: '4px',
-              }}
-            >
-              {deleting ? 'Deleting...' : 'Delete'}
-            </button>
-          )}
+          <button
+            onClick={handleDelete}
+            disabled={!interactive || deleting}
+            style={{
+              padding: '6px 12px', borderRadius: '8px', fontSize: '13px',
+              cursor: (!interactive || deleting) ? 'not-allowed' : 'pointer',
+              border: '1px solid #fca5a5', background: '#fef2f2', color: '#991b1b',
+              opacity: (!interactive || deleting) ? 0.45 : 1,
+              filter: !interactive ? 'grayscale(40%)' : 'none',
+              display: 'flex', alignItems: 'center', gap: '4px',
+            }}
+          >
+            {deleting ? 'Deleting...' : 'Delete'}
+          </button>
         </div>
       </div>
 
