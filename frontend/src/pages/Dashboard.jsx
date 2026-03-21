@@ -281,20 +281,6 @@ function Dashboard() {
           </div>
         </div>
 
-        <button
-          onClick={handleRefreshNow}
-          disabled={refreshing}
-          className={`dashboard__refresh-btn ${refreshing ? 'dashboard__refresh-btn--loading' : ''}`}
-        >
-          {refreshing ? (
-            <>
-              <LoadingSpinner size="small" inline />
-              Fetching...
-            </>
-          ) : (
-            'Refresh Now'
-          )}
-        </button>
       </div>
 
       {/* Stats Bar */}
