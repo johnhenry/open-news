@@ -2,7 +2,7 @@ import db from './database.js';
 
 // Field whitelists for safe updates
 const ALLOWED_SOURCE_FIELDS = ['name', 'url', 'rss_url', 'api_url', 'bias', 'bias_score', 'scraping_enabled', 'active', 'notes'];
-const ALLOWED_ARTICLE_FIELDS = ['title', 'excerpt', 'content', 'image_url', 'bias', 'bias_score', 'sentiment_score'];
+const ALLOWED_ARTICLE_FIELDS = ['title', 'excerpt', 'content', 'image_url', 'bias', 'bias_score', 'sentiment_score', 'analysis_method'];
 
 /**
  * Filter object to only include allowed fields
@@ -111,13 +111,13 @@ export const Article = {
     const stmt = db.prepare(`
       INSERT INTO articles (
         source_id, title, url, author, published_at, excerpt, content,
-        image_url, bias, bias_score, sentiment_score
+        image_url, bias, bias_score, sentiment_score, analysis_method
       ) VALUES (
         @source_id, @title, @url, @author, @published_at, @excerpt, @content,
-        @image_url, @bias, @bias_score, @sentiment_score
+        @image_url, @bias, @bias_score, @sentiment_score, @analysis_method
       )
     `);
-    return stmt.run(article);
+    return stmt.run({ analysis_method: 'source_default', ...article });
   },
 
   update(id, updates) {
@@ -142,7 +142,7 @@ export const Article = {
    * Search articles by keyword with optional filters.
    * Uses LIKE for full-text search on title, excerpt, and content.
    */
-  search({ q, bias, source, source_id, from, to, limit = 50, offset = 0 }) {
+  search({ q, bias, source, source_id, from, to, analysis_method, limit = 50, offset = 0 }) {
     const conditions = [];
     const params = [];
 
@@ -175,6 +175,11 @@ export const Article = {
     if (to) {
       conditions.push('a.published_at <= ?');
       params.push(to + 'T23:59:59.999Z');
+    }
+
+    if (analysis_method) {
+      conditions.push('a.analysis_method = ?');
+      params.push(analysis_method);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS articles (
   bias TEXT,
   bias_score REAL,
   sentiment_score REAL,
+  analysis_method TEXT DEFAULT 'source_default',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (source_id) REFERENCES sources(id)

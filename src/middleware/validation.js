@@ -31,7 +31,8 @@ export const articleQuerySchema = {
     limit: { type: 'integer', minimum: 1, maximum: 500, default: 100 },
     offset: { type: 'integer', minimum: 0, default: 0 },
     bias: { type: 'string' },
-    source_id: { type: 'integer', minimum: 1 }
+    source_id: { type: 'integer', minimum: 1 },
+    analysis_method: { type: 'string', enum: ['source_default', 'keyword', 'llm'] }
   }
 };
 

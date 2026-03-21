@@ -32,7 +32,8 @@ export async function registerRoutes(fastify) {
       limit = ARTICLES.DEFAULT_LIMIT,
       offset = 0,
       bias,
-      source_id
+      source_id,
+      analysis_method
     } = request.query;
 
     // Ensure limit and offset are positive integers
@@ -40,10 +41,11 @@ export async function registerRoutes(fastify) {
     const safeOffset = Math.max(0, parseInt(offset) || 0);
 
     // If filters are used, delegate to search which handles total counts with proper WHERE clauses
-    if (bias || source_id) {
+    if (bias || source_id || analysis_method) {
       const searchParams = { limit: safeLimit, offset: safeOffset };
       if (bias) searchParams.bias = bias;
       if (source_id) searchParams.source_id = parseInt(source_id);
+      if (analysis_method) searchParams.analysis_method = analysis_method;
       const result = Article.search(searchParams);
       return {
         articles: result.articles,
@@ -600,11 +602,12 @@ export async function registerRoutes(fastify) {
       source_id,
       from,
       to,
+      analysis_method,
       limit = 50,
       offset = 0
     } = request.query;
 
-    if (!q && !bias && !source && !source_id && !from && !to) {
+    if (!q && !bias && !source && !source_id && !from && !to && !analysis_method) {
       return reply.code(400).send(createErrorResponse(
         'VALIDATION_ERROR',
         'At least one search parameter is required'
@@ -622,6 +625,7 @@ export async function registerRoutes(fastify) {
         source_id: source_id ? parseInt(source_id) : undefined,
         from,
         to,
+        analysis_method,
         limit: safeLimit,
         offset: safeOffset
       });

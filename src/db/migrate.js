@@ -39,6 +39,19 @@ function migrate() {
       }
     }
     
+    // Add analysis_method column to articles if it doesn't exist
+    try {
+      db.exec("ALTER TABLE articles ADD COLUMN analysis_method TEXT DEFAULT 'source_default'");
+      console.log('  Added analysis_method column to articles');
+    } catch (err) {
+      if (!err.message.includes('duplicate column') && !err.message.includes('already exists')) {
+        // Column already exists, that's fine
+        if (!err.message.includes('column') || !err.message.includes('analysis_method')) {
+          console.warn('Warning adding analysis_method column:', err.message);
+        }
+      }
+    }
+
     console.log('✅ Database migration completed successfully');
   } catch (error) {
     console.error('❌ Database migration failed:', error);

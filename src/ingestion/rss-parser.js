@@ -66,7 +66,8 @@ export async function fetchRSSFeed(source) {
           image_url: extractImageUrl(item),
           bias: source.bias,
           bias_score: source.bias_score,
-          sentiment_score: 0
+          sentiment_score: 0,
+          analysis_method: 'source_default'
         };
 
         // For keyword analysis, do it synchronously (fast)
@@ -75,6 +76,7 @@ export async function fetchRSSFeed(source) {
           articleData.bias = analysis.bias;
           articleData.bias_score = analysis.bias_score;
           articleData.sentiment_score = analysis.sentiment_score;
+          articleData.analysis_method = 'keyword';
         }
 
         const article = articleData;
@@ -147,7 +149,8 @@ async function runAsyncLLMAnalysis(articles, analyzer, sourceDefaultBias) {
         Article.update(article.id, {
           bias: analysis.bias,
           bias_score: analysis.bias_score,
-          sentiment_score: analysis.sentiment_score
+          sentiment_score: analysis.sentiment_score,
+          analysis_method: 'llm'
         });
         analyzed++;
         console.log(`  ✅ LLM analyzed: "${article.title.substring(0, 50)}..." → bias: ${analysis.bias_score}`);

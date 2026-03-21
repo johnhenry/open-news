@@ -38,7 +38,14 @@ function getDateRange(key) {
   }
 }
 
-function buildParams(query, biases, dateRange, source) {
+const ANALYSIS_OPTIONS = [
+  { key: '', label: 'All' },
+  { key: 'llm', label: 'AI Analyzed' },
+  { key: 'keyword', label: 'Keyword' },
+  { key: 'source_default', label: 'Unanalyzed' },
+];
+
+function buildParams(query, biases, dateRange, source, analysisMethod) {
   const params = {};
   if (query.trim()) params.q = query.trim();
   if (biases.length > 0) params.bias = biases.join(',');
@@ -51,14 +58,16 @@ function buildParams(query, biases, dateRange, source) {
       params.source = source;
     }
   }
+  if (analysisMethod) params.analysis_method = analysisMethod;
   return params;
 }
 
-function SearchBar({ onSearch, sources = [], showSourceFilter = false, placeholder = 'Search stories...' }) {
+function SearchBar({ onSearch, sources = [], showSourceFilter = false, showAnalysisFilter = false, placeholder = 'Search stories...' }) {
   const [query, setQuery] = useState('');
   const [selectedBiases, setSelectedBiases] = useState([]);
   const [dateRange, setDateRange] = useState('all');
   const [selectedSource, setSelectedSource] = useState('');
+  const [analysisMethod, setAnalysisMethod] = useState('');
   const debounceRef = useRef(null);
   // Store onSearch in a ref so it's always current without being a dependency
   const onSearchRef = useRef(onSearch);
@@ -75,11 +84,11 @@ function SearchBar({ onSearch, sources = [], showSourceFilter = false, placehold
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      const params = buildParams(query, selectedBiases, dateRange, selectedSource);
+      const params = buildParams(query, selectedBiases, dateRange, selectedSource, analysisMethod);
       onSearchRef.current(params);
     }, 300);
     return () => clearTimeout(debounceRef.current);
-  }, [query, selectedBiases, dateRange, selectedSource]);
+  }, [query, selectedBiases, dateRange, selectedSource, analysisMethod]);
   // Note: onSearch is NOT a dependency — we use the ref instead
 
   function toggleBias(bias) {
@@ -88,13 +97,14 @@ function SearchBar({ onSearch, sources = [], showSourceFilter = false, placehold
     );
   }
 
-  const hasFilters = selectedBiases.length > 0 || dateRange !== 'all' || selectedSource;
+  const hasFilters = selectedBiases.length > 0 || dateRange !== 'all' || selectedSource || analysisMethod;
 
   function clearFilters() {
     setQuery('');
     setSelectedBiases([]);
     setDateRange('all');
     setSelectedSource('');
+    setAnalysisMethod('');
   }
 
   return (
@@ -143,6 +153,18 @@ function SearchBar({ onSearch, sources = [], showSourceFilter = false, placehold
               <option key={opt.key} value={opt.key}>{opt.label}</option>
             ))}
           </select>
+
+          {showAnalysisFilter && (
+            <select
+              className="search-bar__select"
+              value={analysisMethod}
+              onChange={e => setAnalysisMethod(e.target.value)}
+            >
+              {ANALYSIS_OPTIONS.map(opt => (
+                <option key={opt.key} value={opt.key}>{opt.label}</option>
+              ))}
+            </select>
+          )}
 
           {showSourceFilter && sources.length > 0 && (
             <select

@@ -48,8 +48,9 @@ function Articles() {
         if (searchParams.to) apiParams.to = searchParams.to;
         if (searchParams.source) apiParams.source = searchParams.source;
         if (searchParams.source_id) apiParams.source_id = searchParams.source_id;
+        if (searchParams.analysis_method) apiParams.analysis_method = searchParams.analysis_method;
 
-        const hasFilters = searchParams.q || searchParams.bias || searchParams.from || searchParams.to || searchParams.source || searchParams.source_id;
+        const hasFilters = searchParams.q || searchParams.bias || searchParams.from || searchParams.to || searchParams.source || searchParams.source_id || searchParams.analysis_method;
 
         let data;
         if (hasFilters) {
@@ -96,6 +97,7 @@ function Articles() {
         onSearch={handleSearch}
         sources={sources}
         showSourceFilter={true}
+        showAnalysisFilter={true}
         placeholder="Search articles..."
       />
 
@@ -103,9 +105,25 @@ function Articles() {
         {articles.map(article => (
           <div key={article.id} className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
-              <span className={`bias-badge bias-${article.source_bias}`}>
-                {article.source_bias}
-              </span>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span className={`bias-badge bias-${article.source_bias}`}>
+                  {article.source_bias}
+                </span>
+                {article.analysis_method === 'llm' && (
+                  <span style={{
+                    display: 'inline-block', padding: '2px 7px', borderRadius: '10px',
+                    fontSize: '11px', fontWeight: 600, letterSpacing: '0.02em',
+                    background: '#ede9fe', color: '#7c3aed', border: '1px solid #c4b5fd'
+                  }}>AI</span>
+                )}
+                {article.analysis_method === 'keyword' && (
+                  <span style={{
+                    display: 'inline-block', padding: '2px 7px', borderRadius: '10px',
+                    fontSize: '11px', fontWeight: 600, letterSpacing: '0.02em',
+                    background: '#ccfbf1', color: '#0d9488', border: '1px solid #99f6e4'
+                  }}>KW</span>
+                )}
+              </div>
               <span style={{ color: '#6b7280', fontSize: '14px' }}>
                 {article.source_name}
               </span>
