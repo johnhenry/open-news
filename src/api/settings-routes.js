@@ -173,8 +173,15 @@ export async function registerSettingsRoutes(fastify) {
           break;
       }
 
-      // Get current model from settings
-      const currentModel = Settings.get(`${adapter}_model`) || '';
+      // Get current model from settings, fall back to env var
+      const envModelKeys = {
+        ollama: 'OLLAMA_MODEL',
+        openai: 'OPENAI_MODEL',
+        anthropic: 'ANTHROPIC_MODEL',
+        gemini: 'GEMINI_MODEL',
+        lmstudio: 'LMSTUDIO_MODEL',
+      };
+      const currentModel = Settings.get(`${adapter}_model`) || process.env[envModelKeys[adapter]] || '';
 
       return {
         models,

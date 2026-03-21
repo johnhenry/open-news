@@ -952,7 +952,17 @@ function Settings() {
             <div className="adapters-grid">
               {adapters.map(adapter => (
                 <div key={adapter.name} className={`adapter-card ${adapter.active ? 'active' : ''}`}>
-                  <h3>{adapter.name.toUpperCase()}</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3>{adapter.name.toUpperCase()}</h3>
+                    {adapter.active && (
+                      <span style={{
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
+                        background: '#dcfce7', color: '#166534', border: '1px solid #86efac',
+                      }}>
+                        Active
+                      </span>
+                    )}
+                  </div>
                   <div className="adapter-status">
                     <span className={`status-dot ${adapter.available ? 'available' : 'unavailable'}`} />
                     {adapter.available ? 'Available' : 'Not Available'}
@@ -1035,14 +1045,13 @@ function Settings() {
                         'Test'
                       )}
                     </button>
-                    {!readOnly && !adapter.active && adapter.available && (
+                    {adapter.available && (
                       <button
                         onClick={async () => {
                           try {
                             setSettingActiveAdapter(adapter.name);
                             await newsAPI.updateSettings({ llm_adapter: adapter.name });
                             showMessage(`${adapter.name} is now the active adapter`, 'success');
-                            // Reload all data to refresh adapter statuses
                             await loadAllData();
                           } catch (err) {
                             showMessage(`Failed to set ${adapter.name} as active`, 'error');
@@ -1050,7 +1059,7 @@ function Settings() {
                             setSettingActiveAdapter(null);
                           }
                         }}
-                        disabled={settingActiveAdapter === adapter.name}
+                        disabled={readOnly || adapter.active || settingActiveAdapter === adapter.name}
                         className="button primary"
                         style={{ 
                           display: 'flex', 
