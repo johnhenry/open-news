@@ -572,8 +572,8 @@ function Settings() {
           <div className="settings-section">
             <div className="section-header">
               <h2>News Sources</h2>
-              {!readOnly && (
-                <button onClick={() => setShowAddSource(true)} className="add-button">
+              {(
+                <button onClick={() => setShowAddSource(true)} className="add-button" disabled={readOnly}>
                   + Add Source
                 </button>
               )}
@@ -582,7 +582,7 @@ function Settings() {
               Manage RSS feeds and news sources. Add new sources, edit existing ones, or toggle them on/off.
             </p>
 
-            {!readOnly && (showAddSource || editingSource) && (
+            {(showAddSource || editingSource) && (
               <SourceForm
                 source={editingSource || {}}
                 onSave={saveSource}
@@ -620,14 +620,11 @@ function Settings() {
                           source.active ? '✓ Enabled' : '○ Disabled'
                         )}
                       </button>
-                      {!readOnly && (
-                        <button onClick={() => setEditingSource(source)}>✏️ Edit</button>
-                      )}
-                      {!readOnly && (
+                        <button onClick={() => setEditingSource(source)} disabled={readOnly}>✏️ Edit</button>
                         <button
                           onClick={() => deleteSource(source.id)}
                           className="danger"
-                          disabled={deletingSource === source.id}
+                          disabled={readOnly || deletingSource === source.id}
                           style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                         >
                           {deletingSource === source.id ? (
@@ -639,7 +636,6 @@ function Settings() {
                             '🗑️ Delete'
                           )}
                         </button>
-                      )}
                     </div>
                   </div>
               ))}
@@ -1003,7 +999,7 @@ function Settings() {
                         </select>
                         <button 
                           onClick={() => fetchModelsForAdapter(adapter.name)}
-                          disabled={loadingModels[adapter.name]}
+                          disabled={readOnly || loadingModels[adapter.name]}
                           className="button"
                           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%' }}
                         >
@@ -1023,7 +1019,7 @@ function Settings() {
                   <div className="adapter-actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
                     <button 
                       onClick={() => testAdapter(adapter.name)}
-                      disabled={!adapter.available || testingAdapter === adapter.name}
+                      disabled={readOnly || !adapter.available || testingAdapter === adapter.name}
                       className="button"
                       style={{ 
                         display: 'flex', 
@@ -1201,12 +1197,11 @@ function Settings() {
             <div className="data-actions">
               <h3>Manual Maintenance</h3>
 
-              {!readOnly && (
               <div className="maintenance-section">
                 <h4>Cache Management</h4>
                 <button
                   onClick={clearCache}
-                  disabled={clearingCache}
+                  disabled={readOnly || clearingCache}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
                   {clearingCache ? (
@@ -1219,7 +1214,6 @@ function Settings() {
                   )}
                 </button>
               </div>
-              )}
 
               <div className="maintenance-section">
                 <h4>Backup & Export</h4>
@@ -1269,13 +1263,12 @@ function Settings() {
                 </div>
               </div>
 
-              {!readOnly && (
               <div className="maintenance-section">
                 <h4>Restore & Import</h4>
                 <div className="action-buttons">
                   <button
                     onClick={() => importData('all')}
-                    disabled={importingData === 'all'}
+                    disabled={readOnly || importingData === 'all'}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   >
                     {importingData === 'all' ? (
@@ -1289,7 +1282,7 @@ function Settings() {
                   </button>
                   <button
                     onClick={() => importData('settings')}
-                    disabled={importingData === 'settings'}
+                    disabled={readOnly || importingData === 'settings'}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   >
                     {importingData === 'settings' ? (
@@ -1303,7 +1296,7 @@ function Settings() {
                   </button>
                   <button
                     onClick={() => importData('sources')}
-                    disabled={importingData === 'sources'}
+                    disabled={readOnly || importingData === 'sources'}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   >
                     {importingData === 'sources' ? (
@@ -1317,7 +1310,6 @@ function Settings() {
                   </button>
                 </div>
               </div>
-              )}
             </div>
 
             <div className="settings-group">
@@ -1671,7 +1663,7 @@ function SourceForm({ source, onSave, onCancel, savingSource }) {
       <div className="form-actions">
         <button 
           type="submit"
-          disabled={savingSource}
+          disabled={readOnly || savingSource}
           style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
         >
           {savingSource ? (
