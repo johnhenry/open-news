@@ -22,6 +22,13 @@ function NavBar() {
       <div className="container">
         <div className="header-content">
           <NavLink to="/" className="logo">
+            <svg width="22" height="22" viewBox="0 0 32 32" style={{ marginRight: '8px', verticalAlign: 'middle' }}>
+              <rect x="1" y="8" width="5" height="16" rx="2" fill="#2563eb"/>
+              <rect x="7" y="8" width="5" height="16" rx="2" fill="#60a5fa"/>
+              <rect x="13" y="8" width="6" height="16" rx="2" fill="#6b7280"/>
+              <rect x="20" y="8" width="5" height="16" rx="2" fill="#f59e0b"/>
+              <rect x="26" y="8" width="5" height="16" rx="2" fill="#dc2626"/>
+            </svg>
             Open News
           </NavLink>
           <nav className={`nav ${menuOpen ? 'nav--open' : ''}`}>
