@@ -6,7 +6,7 @@ import './BlindspotSection.css';
 function BlindspotSection() {
   const [blindspots, setBlindspots] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('left');
+  const [activeTab, setActiveTab] = useState('underreported');
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -42,9 +42,9 @@ function BlindspotSection() {
   };
 
   const tabs = [
-    { key: 'left', label: 'Right Blindspots', color: '#dc2626', description: 'Stories the right is missing — only covered by left-leaning sources' },
-    { key: 'right', label: 'Left Blindspots', color: '#1d4ed8', description: 'Stories the left is missing — only covered by right-leaning sources' },
     { key: 'underreported', label: 'Underreported', color: '#6b7280', description: 'Stories with very few sources covering them' },
+    { key: 'right', label: 'Left Blindspots', color: '#1d4ed8', description: 'Stories the left is missing — only covered by right-leaning sources' },
+    { key: 'left', label: 'Right Blindspots', color: '#dc2626', description: 'Stories the right is missing — only covered by left-leaning sources' },
   ];
 
   const activeData = blindspots[activeTab] || [];
