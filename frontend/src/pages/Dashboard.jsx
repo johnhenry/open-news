@@ -8,8 +8,8 @@ import SearchBar from '../components/SearchBar';
 import BlindspotSection from '../components/BlindspotSection';
 
 const SORT_OPTIONS = [
-  { key: 'most_covered', label: 'Most Covered' },
   { key: 'most_recent', label: 'Most Recent' },
+  { key: 'most_covered', label: 'Most Covered' },
   { key: 'most_one_sided', label: 'Most One-Sided' },
 ];
 
@@ -76,7 +76,7 @@ function Dashboard() {
   const [dataStats, setDataStats] = useState(null);
   const [ingestionLogs, setIngestionLogs] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [sortBy, setSortBy] = useState('most_covered');
+  const [sortBy, setSortBy] = useState('most_recent');
   const [searchParams, setSearchParams] = useState({});
   const [newArticleCount, setNewArticleCount] = useState(0);
   const [storyPage, setStoryPage] = useState(0);
