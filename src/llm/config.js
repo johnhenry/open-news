@@ -58,9 +58,42 @@ export const LLM_CONFIG = {
     }
   },
   
-  // Prompts for different tasks
+  // Prompts for different tasks - reads from Settings DB with hardcoded fallbacks
   prompts: {
-    bias_detection: `Analyze the following news article for political bias. Consider:
+    get bias_detection() {
+      try {
+        return Settings.get('llm_prompt_bias_detection') || DEFAULT_PROMPTS.bias_detection;
+      } catch {
+        return DEFAULT_PROMPTS.bias_detection;
+      }
+    },
+    get fact_extraction() {
+      try {
+        return Settings.get('llm_prompt_fact_extraction') || DEFAULT_PROMPTS.fact_extraction;
+      } catch {
+        return DEFAULT_PROMPTS.fact_extraction;
+      }
+    },
+    get consensus_summary() {
+      try {
+        return Settings.get('llm_prompt_consensus_summary') || DEFAULT_PROMPTS.consensus_summary;
+      } catch {
+        return DEFAULT_PROMPTS.consensus_summary;
+      }
+    },
+    get cluster_summary() {
+      try {
+        return Settings.get('llm_prompt_cluster_summary') || DEFAULT_PROMPTS.cluster_summary;
+      } catch {
+        return DEFAULT_PROMPTS.cluster_summary;
+      }
+    }
+  }
+};
+
+// Default prompts used as fallbacks when Settings DB is unavailable
+const DEFAULT_PROMPTS = {
+  bias_detection: `Analyze the following news article for political bias. Consider:
 1. Language tone and emotional words
 2. Source selection and quotes
 3. Framing of issues
@@ -77,7 +110,7 @@ Provide a JSON response with:
   "indicators": ["list", "of", "bias", "indicators", "found"]
 }`,
 
-    fact_extraction: `Extract key factual claims from this news article. Focus on:
+  fact_extraction: `Extract key factual claims from this news article. Focus on:
 1. Statistical claims with numbers
 2. Quoted statements from officials
 3. Event descriptions (who, what, when, where)
@@ -104,7 +137,7 @@ Provide a JSON response with:
   }
 }`,
 
-    consensus_summary: `Given multiple articles about the same topic, identify consensus facts that appear across different sources.
+  consensus_summary: `Given multiple articles about the same topic, identify consensus facts that appear across different sources.
 
 Articles:
 {articles}
@@ -120,7 +153,7 @@ Provide a JSON response with:
   }
 }`,
 
-    cluster_summary: `You are summarizing a news story cluster. Given the following articles about the same topic, generate:
+  cluster_summary: `You are summarizing a news story cluster. Given the following articles about the same topic, generate:
 1. A concise, descriptive title for this story (max 80 chars)
 2. A 2-3 sentence summary of the overall story
 3. A "fact core" — the key facts that all sources agree on
@@ -134,5 +167,4 @@ Provide a JSON response with:
   "summary": "2-3 sentence summary of the story across all sources.",
   "fact_core": "The key facts all sources agree on, stated neutrally."
 }`
-  }
 };

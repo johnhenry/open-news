@@ -151,6 +151,10 @@ export class Settings {
       LLM_CLUSTER_SUMMARY_RATE_LIMIT: 'llm_cluster_summary_rate_limit',
       INGEST_INTERVAL: 'ingestion_interval',
       CLUSTER_INTERVAL: 'clustering_interval',
+      LLM_PROMPT_BIAS_DETECTION: 'llm_prompt_bias_detection',
+      LLM_PROMPT_FACT_EXTRACTION: 'llm_prompt_fact_extraction',
+      LLM_PROMPT_CONSENSUS_SUMMARY: 'llm_prompt_consensus_summary',
+      LLM_PROMPT_CLUSTER_SUMMARY: 'llm_prompt_cluster_summary',
     };
 
     let synced = 0;

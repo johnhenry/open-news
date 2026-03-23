@@ -1085,7 +1085,7 @@ function Settings() {
 
             <div className="settings-group">
               <h3>LLM Settings</h3>
-              {settings.llm?.filter(s => s.key !== 'analysis_method' && s.key !== 'llm_adapter').map(setting => (
+              {settings.llm?.filter(s => s.key !== 'analysis_method' && s.key !== 'llm_adapter' && !s.key.startsWith('llm_prompt_')).map(setting => (
                 <div key={setting.key} className="setting-item">
                   <label>
                     <span className="setting-label">{setting.description}</span>
@@ -1112,6 +1112,27 @@ function Settings() {
                         onChange={(e) => updateSetting('llm', setting.key, e.target.value)}
                       />
                     )}
+                  </label>
+                </div>
+              ))}
+            </div>
+
+            <div className="settings-group">
+              <h3>Prompts</h3>
+              <p className="setting-description" style={{ marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary, #888)' }}>
+                Use <code>{'{article}'}</code> or <code>{'{articles}'}</code> as placeholders for article content.
+              </p>
+              {settings.llm?.filter(s => s.key.startsWith('llm_prompt_')).map(setting => (
+                <div key={setting.key} className="setting-item" style={{ marginBottom: '1rem' }}>
+                  <label>
+                    <span className="setting-label">{setting.description}</span>
+                    <textarea
+                      value={setting.value || ''}
+                      rows={8}
+                      disabled={readOnly}
+                      style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.85rem', resize: 'vertical' }}
+                      onChange={(e) => updateSetting('llm', setting.key, e.target.value)}
+                    />
                   </label>
                 </div>
               ))}

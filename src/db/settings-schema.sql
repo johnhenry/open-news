@@ -64,7 +64,145 @@ INSERT OR IGNORE INTO settings (key, value, type, category, description, default
   ('analysis_method', 'source_default', 'string', 'llm', 'Article analysis method (source_default, keyword, llm)', 'source_default'),
   ('llm_analysis_rate_limit', '-1', 'number', 'llm', 'Max articles to LLM-analyze per ingestion cycle (-1 = unlimited)', '-1'),
   ('llm_cluster_summary_rate_limit', '-1', 'number', 'llm', 'Max clusters to LLM-summarize per cycle (-1 = unlimited)', '-1'),
-  
+  ('llm_prompt_bias_detection', 'Analyze the following news article for political bias. Consider:
+1. Language tone and emotional words
+2. Source selection and quotes
+3. Framing of issues
+4. Missing perspectives
+5. Headlines vs content alignment
+
+Article: {article}
+
+Provide a JSON response with:
+{
+  "bias_score": -1.0 to 1.0 (-1 = far left, 0 = center, 1 = far right),
+  "confidence": 0.0 to 1.0,
+  "reasoning": "brief explanation",
+  "indicators": ["list", "of", "bias", "indicators", "found"]
+}', 'string', 'llm', 'Prompt for bias detection analysis', 'Analyze the following news article for political bias. Consider:
+1. Language tone and emotional words
+2. Source selection and quotes
+3. Framing of issues
+4. Missing perspectives
+5. Headlines vs content alignment
+
+Article: {article}
+
+Provide a JSON response with:
+{
+  "bias_score": -1.0 to 1.0 (-1 = far left, 0 = center, 1 = far right),
+  "confidence": 0.0 to 1.0,
+  "reasoning": "brief explanation",
+  "indicators": ["list", "of", "bias", "indicators", "found"]
+}'),
+  ('llm_prompt_fact_extraction', 'Extract key factual claims from this news article. Focus on:
+1. Statistical claims with numbers
+2. Quoted statements from officials
+3. Event descriptions (who, what, when, where)
+4. Cause-effect claims
+5. Policy or legal facts
+
+Article: {article}
+
+Provide a JSON response with:
+{
+  "facts": [
+    {
+      "claim": "the factual claim",
+      "type": "statistic|quote|event|cause-effect|policy",
+      "confidence": 0.0 to 1.0,
+      "source": "who made this claim if mentioned"
+    }
+  ],
+  "entities": {
+    "people": ["list of people mentioned"],
+    "organizations": ["list of organizations"],
+    "locations": ["list of locations"],
+    "dates": ["list of dates/times mentioned"]
+  }
+}', 'string', 'llm', 'Prompt for fact extraction', 'Extract key factual claims from this news article. Focus on:
+1. Statistical claims with numbers
+2. Quoted statements from officials
+3. Event descriptions (who, what, when, where)
+4. Cause-effect claims
+5. Policy or legal facts
+
+Article: {article}
+
+Provide a JSON response with:
+{
+  "facts": [
+    {
+      "claim": "the factual claim",
+      "type": "statistic|quote|event|cause-effect|policy",
+      "confidence": 0.0 to 1.0,
+      "source": "who made this claim if mentioned"
+    }
+  ],
+  "entities": {
+    "people": ["list of people mentioned"],
+    "organizations": ["list of organizations"],
+    "locations": ["list of locations"],
+    "dates": ["list of dates/times mentioned"]
+  }
+}'),
+  ('llm_prompt_consensus_summary', 'Given multiple articles about the same topic, identify consensus facts that appear across different sources.
+
+Articles:
+{articles}
+
+Provide a JSON response with:
+{
+  "consensus_facts": ["facts that appear in multiple sources"],
+  "disputed_points": ["facts that sources disagree on"],
+  "unique_angles": {
+    "left": ["unique points from left sources"],
+    "center": ["unique points from center sources"],
+    "right": ["unique points from right sources"]
+  }
+}', 'string', 'llm', 'Prompt for consensus summary', 'Given multiple articles about the same topic, identify consensus facts that appear across different sources.
+
+Articles:
+{articles}
+
+Provide a JSON response with:
+{
+  "consensus_facts": ["facts that appear in multiple sources"],
+  "disputed_points": ["facts that sources disagree on"],
+  "unique_angles": {
+    "left": ["unique points from left sources"],
+    "center": ["unique points from center sources"],
+    "right": ["unique points from right sources"]
+  }
+}'),
+  ('llm_prompt_cluster_summary', 'You are summarizing a news story cluster. Given the following articles about the same topic, generate:
+1. A concise, descriptive title for this story (max 80 chars)
+2. A 2-3 sentence summary of the overall story
+3. A "fact core" — the key facts that all sources agree on
+
+Articles:
+{articles}
+
+Provide a JSON response with:
+{
+  "title": "A descriptive title for this story",
+  "summary": "2-3 sentence summary of the story across all sources.",
+  "fact_core": "The key facts all sources agree on, stated neutrally."
+}', 'string', 'llm', 'Prompt for cluster summary generation', 'You are summarizing a news story cluster. Given the following articles about the same topic, generate:
+1. A concise, descriptive title for this story (max 80 chars)
+2. A 2-3 sentence summary of the overall story
+3. A "fact core" — the key facts that all sources agree on
+
+Articles:
+{articles}
+
+Provide a JSON response with:
+{
+  "title": "A descriptive title for this story",
+  "summary": "2-3 sentence summary of the story across all sources.",
+  "fact_core": "The key facts all sources agree on, stated neutrally."
+}'),
+
   -- Ingestion Settings
   ('ingestion_enabled', 'true', 'boolean', 'ingestion', 'Enable automatic ingestion', 'true'),
   ('ingestion_interval', '*/15 * * * *', 'string', 'ingestion', 'Cron expression for ingestion', '*/15 * * * *'),
