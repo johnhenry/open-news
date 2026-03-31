@@ -207,7 +207,7 @@ Provide a JSON response with:
   ('ingestion_enabled', 'true', 'boolean', 'ingestion', 'Enable automatic ingestion', 'true'),
   ('ingestion_interval', '*/15 * * * *', 'string', 'ingestion', 'Cron expression for ingestion', '*/15 * * * *'),
   ('clustering_enabled', 'true', 'boolean', 'ingestion', 'Enable automatic clustering', 'true'),
-  ('clustering_interval', '10 * * * *', 'string', 'ingestion', 'Cron expression for clustering', '*/30 * * * *'),
+  ('clustering_interval', '10 */2 * * *', 'string', 'ingestion', 'Cron expression for clustering', '*/30 * * * *'),
   ('min_cluster_size', '3', 'number', 'ingestion', 'Minimum articles for cluster', '3'),
   ('similarity_threshold', '0.5', 'number', 'ingestion', 'Similarity threshold for clustering', '0.5'),
   
