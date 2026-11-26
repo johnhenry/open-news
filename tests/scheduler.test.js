@@ -61,6 +61,12 @@ describe('job status reflects reality', () => {
     expect(new Date(row.next_run).getTime()).toBeGreaterThan(Date.now());
   });
 
+  test('a job scheduled without a summary function (ingestion) is recorded as success, not error', async () => {
+    ScheduledJobs.update('ingestion', { enabled: 1, cron_expression: '0 */2 * * *', status: 'idle' });
+    await sched.runJob('ingestion', async () => ({ results: [], totalArticles: 0 }), null);
+    expect(ScheduledJobs.get('ingestion').status).toBe('success');
+  });
+
   test('overlapping runs of the same job are skipped, not stacked', async () => {
     let release;
     const gate = new Promise(r => { release = r; });

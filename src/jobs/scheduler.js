@@ -75,7 +75,8 @@ function nextRunIso(expression) {
  * next_run recomputed from the cron expression either way. A job that is still running
  * is not started a second time.
  */
-export async function runJob(name, task, summarize = () => null) {
+export async function runJob(name, task, summarize) {
+  summarize = summarize || (() => null);
   if (running.has(name)) {
     console.log(`⏭️  ${name} is still running, skipping this tick`);
     return { skipped: true };
