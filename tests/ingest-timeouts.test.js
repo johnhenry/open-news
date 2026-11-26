@@ -30,6 +30,14 @@ describe('ingestion cannot hang', () => {
     expect(Date.now() - t0).toBeLessThan(3000);
   });
 
+  test('article pages are fetched with an honest bot User-Agent (The Guardian 403s Mozilla-style ones)', async () => {
+    const stub = await startStub((req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<html><body><article>' + 'text '.repeat(40) + '</article></body></html>'); });
+    const r = await extractContent(`${stub.url}/story`, false);
+    await stub.close();
+    expect(r.text).toContain('text');
+    expect(stub.requests[0].headers['user-agent']).toMatch(/^OpenNews\//);
+  });
+
   test('withTimeout rejects a source that takes too long and passes fast ones through', async () => {
     await expect(withTimeout(new Promise(() => {}), 100, 'slow feed')).rejects.toThrow(/slow feed.*timed out/i);
     await expect(withTimeout(Promise.resolve(7), 100, 'x')).resolves.toBe(7);

@@ -18,7 +18,7 @@ export async function extractContent(url, useScraperPlugin = false) {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; OpenNews/1.0; +https://github.com/open-news)'
+        'User-Agent': 'OpenNews/1.0 (+https://open-news.johnhenry.me)'
       },
       signal: ctrl.signal
     });
