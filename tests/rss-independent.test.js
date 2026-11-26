@@ -27,7 +27,7 @@ describe('The Independent feed (gzip served without Accept-Encoding)', () => {
     await stub.close();
     expect(result.success.length).toBeGreaterThan(10);
     expect(db.prepare('SELECT COUNT(*) c FROM articles WHERE source_id = ?').get(id).c).toBe(result.success.length);
-    expect(stub.requests[0].headers['user-agent']).toMatch(/OpenNews/);
+    expect(stub.requests[0].headers['user-agent']).toMatch(/^OpenNews\//); // Guardian 403s Mozilla-style bot UAs
   });
 
   test('an HTML page where a feed should be gives a clear error, not an XML parse error', async () => {

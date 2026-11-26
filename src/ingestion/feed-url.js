@@ -1,6 +1,8 @@
 import nodeFetch from 'node-fetch';
 
-export const FEED_USER_AGENT = 'Mozilla/5.0 (compatible; OpenNews/1.0; +https://open-news.johnhenry.me)';
+// Not Mozilla-prefixed on purpose: The Guardian's bot filter answers 403 to browser-like agents
+// that are not real browsers, and 200 to an honest bot UA.
+export const FEED_USER_AGENT = 'OpenNews/1.0 (+https://open-news.johnhenry.me)';
 const FEED_TIMEOUT_MS = parseInt(process.env.FEED_TIMEOUT_MS || '20000', 10);
 const HTTPS_MEMO_MS = 60 * 60 * 1000;
 

@@ -9,12 +9,18 @@ export async function extractContent(url, useScraperPlugin = false) {
     }
   }
 
+  // node-fetch v3 has no `timeout` option: abort explicitly, covering the body read too, or one
+  // stalled article page can hang the whole ingestion run.
+  const timeoutMs = parseInt(process.env.CONTENT_TIMEOUT_MS || '15000', 10);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
   try {
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; OpenNews/1.0; +https://github.com/open-news)'
       },
-      timeout: 10000
+      signal: ctrl.signal
     });
 
     if (!response.ok) {
@@ -67,8 +73,10 @@ export async function extractContent(url, useScraperPlugin = false) {
     };
 
   } catch (error) {
-    console.error(`Failed to extract content from ${url}:`, error.message);
+    console.error(`Failed to extract content from ${url}:`, ctrl.signal.aborted ? `timed out after ${timeoutMs} ms` : error.message);
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
