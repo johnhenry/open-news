@@ -1,7 +1,7 @@
 import { Settings, ScheduledJobs, LLMCache } from '../db/settings-model.js';
 import { Source } from '../db/models.js';
 import { getLLMManager } from '../llm/manager.js';
-import { scheduleIngestion, scheduleClustering, scheduleBackup, scheduleCleanup } from '../jobs/scheduler.js';
+import { scheduleIngestion, scheduleClustering, scheduleBackup, scheduleCleanup, getJobsStatus } from '../jobs/scheduler.js';
 import { getDb } from '../db/index.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -433,7 +433,7 @@ export async function registerSettingsRoutes(fastify) {
 
   // Get scheduled jobs (public - read-only)
   fastify.get('/api/settings/jobs', async (request, reply) => {
-    return ScheduledJobs.getAll();
+    return getJobsStatus();
   });
 
   // Update scheduled job (requires auth + interactive mode)

@@ -3,6 +3,7 @@ import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SearchBar from '../components/SearchBar';
 import { format } from 'date-fns';
+import { parseApiDate } from '../utils/time.mjs';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
@@ -239,7 +240,7 @@ function Articles() {
             <div style={{ display: 'flex', gap: '20px', fontSize: '14px', color: '#6b7280' }}>
               {article.author && <span>By {article.author}</span>}
               {article.published_at && (
-                <span>{format(new Date(article.published_at), 'MMM d, yyyy h:mm a')}</span>
+                <span>{format(parseApiDate(article.published_at) || new Date(0), 'MMM d, yyyy h:mm a')}</span>
               )}
             </div>
 

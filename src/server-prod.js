@@ -45,6 +45,7 @@ import('./jobs/scheduler.js').then(({ initializeScheduler }) => {
 // Register API routes
 import { registerRoutes } from './api/routes.js';
 import { registerSettingsRoutes } from './api/settings-routes.js';
+import { registerSpa } from './spa.js';
 
 await registerRoutes(fastify);
 await registerSettingsRoutes(fastify);
@@ -58,14 +59,8 @@ await fastify.register(fastifyStatic, {
   prefix: '/'
 });
 
-// SPA fallback - serve index.html for all non-API routes
-fastify.setNotFoundHandler((request, reply) => {
-  if (request.url.startsWith('/api/')) {
-    reply.code(404).send({ error: 'API endpoint not found' });
-  } else {
-    reply.sendFile('index.html');
-  }
-});
+// App shell for client routes only; real 404s for everything else (see spa.js)
+registerSpa(fastify);
 
 // Start server
 const PORT = process.env.PORT || 3001;

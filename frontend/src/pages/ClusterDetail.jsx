@@ -4,6 +4,7 @@ import { newsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import BiasSpectrum from '../components/BiasSpectrum';
 import { format } from 'date-fns';
+import { parseApiDate } from '../utils/time.mjs';
 
 const COLORS = {
   left: '#2563eb',
@@ -113,7 +114,7 @@ function ClusterDetail() {
 
   // All articles sorted by date for framing view
   const allArticlesSorted = [...allArticles].sort(
-    (a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0)
+    (a, b) => (parseApiDate(b.published_at) || 0) - (parseApiDate(a.published_at) || 0)
   );
 
   const totalSources = new Set(allArticles.map(a => a.source_name)).size;
@@ -249,7 +250,7 @@ function ClusterDetail() {
                   </span>
                   {article.published_at && (
                     <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                      {format(new Date(article.published_at), 'MMM d, h:mm a')}
+                      {format(parseApiDate(article.published_at) || new Date(0), 'MMM d, h:mm a')}
                     </span>
                   )}
                 </div>
@@ -306,7 +307,7 @@ function ClusterDetail() {
                       {article.published_at && (
                         <>
                           <span>·</span>
-                          <span>{format(new Date(article.published_at), 'MMM d, h:mm a')}</span>
+                          <span>{format(parseApiDate(article.published_at) || new Date(0), 'MMM d, h:mm a')}</span>
                         </>
                       )}
                     </div>

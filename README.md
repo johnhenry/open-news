@@ -132,6 +132,31 @@ Edit `config/sources.json`:
 }
 ```
 
+### LLM client, limits and safety switches
+
+All optional; with none of them set behaviour is unchanged (provider from `LLM_ADAPTER` + `OLLAMA_*` / `OPENAI_*`).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LLM_BASE_URL` | unset | Base URL of an OpenAI-compatible (`.../v1`, adapter `openai`/`lmstudio`) or Ollama-compatible (adapter `ollama`) endpoint; overrides the adapter's own base URL |
+| `LLM_MODEL` | unset | Model name sent to that endpoint |
+| `LLM_API_KEY` | unset | Bearer key for that endpoint |
+| `LLM_TIMEOUT_MS` | `120000` | Per-call timeout |
+| `LLM_MAX_CONCURRENCY` | `1` | Calls in flight at once |
+| `LLM_QUEUE_MAX` | `50` | Calls allowed to wait; beyond that a call is refused (article stays retryable) |
+| `LLM_JSON_MODE` | `true` | Ask for JSON output (`response_format` / Ollama `format: json`); retried without if the server rejects it |
+| `EMBEDDINGS_BASE_URL` / `EMBEDDINGS_MODEL` / `EMBEDDINGS_API_KEY` | unset | OpenAI-compatible `/embeddings` for cluster refinement; unset uses the local MiniLM model. Failure falls back to keyword clusters |
+| `ALLOW_ARTICLE_CLEANUP` | unset (off) | Retention cleanup deletes nothing unless this is `true` |
+
+Failed LLM analysis is stored as `analysis_method = llm_failed` (or `llm_skipped` after 3 tries) with no
+confidence and the source's default bias, never as an LLM score of 0. Only articles ingested in the last
+3 days are ever retried; nothing iterates the history.
+
+### Tests
+
+`npm test` (Jest, ESM; the native `better-sqlite3` build must match your Node). Tests use a throwaway
+SQLite file and stub HTTP servers; they never call a real LLM provider.
+
 ## 📊 Pre-configured Sources
 
 | Left | Center-Left | Center | Center-Right | Right |

@@ -1,7 +1,25 @@
+import nodeFetch from 'node-fetch';
+import { LLM_CONFIG } from './config.js';
+
 export class BaseLLMAdapter {
   constructor(config) {
     this.config = config;
     this.name = 'base';
+  }
+
+  /** fetch with the per-call timeout (LLM_TIMEOUT_MS). */
+  async fetchWithTimeout(url, options = {}) {
+    const timeoutMs = LLM_CONFIG.timeout_ms;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      return await nodeFetch(url, { ...options, signal: ctrl.signal });
+    } catch (error) {
+      if (ctrl.signal.aborted) throw new Error(`LLM request timed out after ${timeoutMs} ms`);
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async initialize() {
@@ -20,18 +38,21 @@ export class BaseLLMAdapter {
     try {
       const response = await this.complete(prompt, {
         temperature: 0.3,
-        max_tokens: 1000
+        max_tokens: 1000,
+        json_mode: true
       });
       
       return this.parseJSONResponse(response);
     } catch (error) {
       console.error(`Bias detection failed with ${this.name}:`, error.message);
+      // A failed call is "not analysed": _failed makes callers record that, never a score of 0.
       return {
-        bias_score: 0,
-        confidence: 0,
-        reasoning: 'Analysis failed',
+        bias_score: null,
+        confidence: null,
+        reasoning: `LLM call failed: ${error.message}`,
         indicators: [],
-        error: error.message
+        error: error.message,
+        _failed: true
       };
     }
   }
@@ -42,7 +63,8 @@ export class BaseLLMAdapter {
     try {
       const response = await this.complete(prompt, {
         temperature: 0.2,
-        max_tokens: 800
+        max_tokens: 800,
+        json_mode: true
       });
       
       return this.parseJSONResponse(response);
@@ -56,7 +78,8 @@ export class BaseLLMAdapter {
           locations: [],
           dates: []
         },
-        error: error.message
+        error: error.message,
+        _failed: true
       };
     }
   }
@@ -71,7 +94,8 @@ export class BaseLLMAdapter {
     try {
       const response = await this.complete(prompt, {
         temperature: 0.3,
-        max_tokens: 800
+        max_tokens: 800,
+        json_mode: true
       });
 
       return this.parseJSONResponse(response);
@@ -91,7 +115,8 @@ export class BaseLLMAdapter {
     try {
       const response = await this.complete(prompt, {
         temperature: 0.3,
-        max_tokens: 1000
+        max_tokens: 1000,
+        json_mode: true
       });
       
       return this.parseJSONResponse(response);
@@ -186,8 +211,8 @@ export class BaseLLMAdapter {
 
   _fallbackResponse(reason) {
     return {
-      bias_score: 0,
-      confidence: 0,
+      bias_score: null,
+      confidence: null,
       reasoning: reason,
       indicators: [],
       _failed: true

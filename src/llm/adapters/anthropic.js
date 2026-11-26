@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { BaseLLMAdapter } from '../base-adapter.js';
 
 export class AnthropicAdapter extends BaseLLMAdapter {
@@ -19,7 +18,7 @@ export class AnthropicAdapter extends BaseLLMAdapter {
 
     try {
       // Test the API with a minimal request
-      const response = await fetch(`${this.baseUrl}/messages`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,7 +61,7 @@ export class AnthropicAdapter extends BaseLLMAdapter {
     };
 
     try {
-      const response = await fetch(`${this.baseUrl}/messages`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +108,7 @@ export class AnthropicAdapter extends BaseLLMAdapter {
     };
 
     try {
-      const response = await fetch(`${this.baseUrl}/messages`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

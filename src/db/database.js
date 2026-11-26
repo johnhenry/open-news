@@ -11,7 +11,7 @@ if (!fs.existsSync(dirname(dbPath))) {
 }
 
 // Only enable verbose SQL logging in development mode
-const isDevelopment = process.env.NODE_ENV !== 'production';
+const isDevelopment = process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test';
 const verboseLogger = isDevelopment ? console.log : null;
 
 const db = new Database(dbPath, { verbose: verboseLogger });

@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { BaseLLMAdapter } from '../base-adapter.js';
 
 export class OllamaAdapter extends BaseLLMAdapter {
@@ -9,7 +8,7 @@ export class OllamaAdapter extends BaseLLMAdapter {
     this.model = config.adapters.ollama.model;
     this.options = config.adapters.ollama.options;
     // Support auth for Ollama Cloud
-    this.apiKey = process.env.OLLAMA_API_KEY || process.env.OPENAI_API_KEY || '';
+    this.apiKey = config.adapters.ollama.api_key || '';
   }
 
   _getHeaders() {
@@ -22,7 +21,7 @@ export class OllamaAdapter extends BaseLLMAdapter {
 
   async initialize() {
     try {
-      const response = await fetch(`${this.baseUrl}/api/tags`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/api/tags`, {
         headers: this._getHeaders()
       });
       if (!response.ok) {
@@ -52,20 +51,23 @@ export class OllamaAdapter extends BaseLLMAdapter {
   }
 
   async complete(prompt, options = {}) {
+    const { json_mode, ...modelOptions } = options;
     const requestBody = {
       model: this.model,
       prompt: prompt,
       stream: false,
+      // Ollama's structured-output switch: constrains the reply to valid JSON
+      format: json_mode && this.config.json_mode ? 'json' : undefined,
       options: {
         ...this.options,
-        ...options,
+        ...modelOptions,
         temperature: options.temperature || this.options.temperature,
         num_predict: options.max_tokens || this.options.max_tokens
       }
     };
 
     try {
-      const response = await fetch(`${this.baseUrl}/api/generate`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/api/generate`, {
         method: 'POST',
         headers: this._getHeaders(),
         body: JSON.stringify(requestBody)
@@ -73,13 +75,14 @@ export class OllamaAdapter extends BaseLLMAdapter {
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`Ollama request failed: ${error}`);
+        throw new Error(`Ollama request failed (HTTP ${response.status}): ${error.slice(0, 300)}`);
       }
 
       const data = await response.json();
+      if (typeof data.response !== 'string') throw new Error('Ollama response had no text');
       return data.response;
     } catch (error) {
-      console.error('Ollama completion error:', error);
+      console.error('Ollama completion error:', error.message);
       throw error;
     }
   }
@@ -98,7 +101,7 @@ export class OllamaAdapter extends BaseLLMAdapter {
     };
 
     try {
-      const response = await fetch(`${this.baseUrl}/api/chat`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/api/chat`, {
         method: 'POST',
         headers: this._getHeaders(),
         body: JSON.stringify(requestBody)
@@ -121,7 +124,7 @@ export class OllamaAdapter extends BaseLLMAdapter {
     console.log(`📥 Pulling Ollama model: ${modelName}`);
 
     try {
-      const response = await fetch(`${this.baseUrl}/api/pull`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/api/pull`, {
         method: 'POST',
         headers: this._getHeaders(),
         body: JSON.stringify({
@@ -146,7 +149,7 @@ export class OllamaAdapter extends BaseLLMAdapter {
 
   async ensureModel() {
     try {
-      const response = await fetch(`${this.baseUrl}/api/show`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/api/show`, {
         method: 'POST',
         headers: this._getHeaders(),
         body: JSON.stringify({ name: this.model })

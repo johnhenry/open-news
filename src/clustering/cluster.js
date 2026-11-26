@@ -1,18 +1,18 @@
 import natural from 'natural';
-import kmeans from 'ml-kmeans';
+import { kmeans } from 'ml-kmeans';
 import mlDistance from 'ml-distance';
 import { Article, Cluster, Embedding } from '../db/models.js';
 import { Settings } from '../db/settings-model.js';
-import { generateEmbedding } from './embeddings.js';
+import { generateEmbedding, getEmbeddingsConfig } from './embeddings.js';
 import { getLLMManager } from '../llm/manager.js';
 
-const { euclidean } = mlDistance;
+const euclidean = mlDistance.distance.euclidean;
 
 const TfIdf = natural.TfIdf;
 
 // Rate limit: max clusters to LLM-summarize per cycle (-1 = unlimited)
 function getLLMClusterSummaryRateLimit() {
-  const val = parseInt(Settings.get('llm_cluster_summary_rate_limit') || process.env.getLLMClusterSummaryRateLimit() || '10');
+  const val = parseInt(Settings.get('llm_cluster_summary_rate_limit') || process.env.LLM_CLUSTER_SUMMARY_RATE_LIMIT || '10');
   return val === -1 ? Infinity : val;
 }
 
@@ -200,14 +200,18 @@ async function refineClusterWithEmbeddings(articles, minClusterSize) {
 
   try {
     const embeddings = [];
-    
+    const modelName = getEmbeddingsConfig().model;
+
     for (const article of articles) {
-      let embedding = Embedding.getVector(article.id);
-      
+      // Reuse a stored vector only if it came from the model currently configured
+      // (vectors from different models are not comparable and may differ in size).
+      const stored = Embedding.get(article.id);
+      let embedding = stored && stored.model_name === modelName ? Embedding.getVector(article.id) : null;
+
       if (!embedding) {
         embedding = await generateEmbedding(article);
         if (embedding) {
-          Embedding.create(article.id, embedding, 'sentence-transformers/all-MiniLM-L6-v2');
+          Embedding.create(article.id, embedding, modelName);
         }
       }
       
@@ -216,7 +220,9 @@ async function refineClusterWithEmbeddings(articles, minClusterSize) {
       }
     }
 
-    if (embeddings.length < articles.length || embeddings.length < 3) {
+    // No (or incomplete, or mixed-size) embeddings: keep the keyword cluster as it is.
+    if (embeddings.length < articles.length || embeddings.length < 3 ||
+        embeddings.some(e => e.length !== embeddings[0].length)) {
       return [articles];
     }
 

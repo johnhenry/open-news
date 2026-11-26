@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { registerRoutes } from './api/routes.js';
 import { registerSettingsRoutes } from './api/settings-routes.js';
+import { registerSpa } from './spa.js';
 import migrate from './db/migrate.js';
 import { initializeScheduler } from './jobs/scheduler.js';
 import { RATE_LIMIT, TIMEOUTS, CONTENT } from './config/constants.js';
@@ -103,17 +104,8 @@ if (fs.existsSync(frontendBuildPath)) {
     wildcard: false
   });
 
-  // Serve index.html for all non-API routes (SPA support)
-  fastify.setNotFoundHandler((request, reply) => {
-    if (!request.url.startsWith('/api')) {
-      return reply.sendFile('index.html');
-    }
-    reply.code(404).send({
-      error: true,
-      code: 'NOT_FOUND',
-      message: 'Resource not found'
-    });
-  });
+  // App shell for client routes only; real 404s for everything else
+  registerSpa(fastify);
 }
 
 await registerRoutes(fastify);

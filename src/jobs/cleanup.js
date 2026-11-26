@@ -1,7 +1,17 @@
 import { getDb } from '../db/index.js';
 import { Settings } from '../db/settings-model.js';
 
+// Retention cleanup deletes articles. It is OFF unless ALLOW_ARTICLE_CLEANUP=true is set in the
+// environment (the owner's hold on deleting articles); scheduled and manual runs both honour it.
+export function isCleanupAllowed() {
+  return (process.env.ALLOW_ARTICLE_CLEANUP || '').toLowerCase() === 'true';
+}
+
 export async function runCleanup() {
+  if (!isCleanupAllowed()) {
+    console.log('🗑️  Cleanup skipped: ALLOW_ARTICLE_CLEANUP is not true (retention hold)');
+    return { skipped: true, reason: 'ALLOW_ARTICLE_CLEANUP is not true', articlesDeleted: 0, entitiesDeleted: 0, retentionDays: null };
+  }
   console.log('🗑️  Running cleanup...');
   
   const retentionDays = Settings.get('article_retention_days') || 30;

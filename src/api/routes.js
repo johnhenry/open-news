@@ -20,7 +20,7 @@ const statsCache = {
 export async function registerRoutes(fastify) {
 
   fastify.get('/api/health', async (request, reply) => {
-    return { status: 'ok', timestamp: new Date().toISOString() };
+    return { status: 'ok', timestamp: new Date().toISOString(), version: process.env.GIT_REV || null };
   });
 
   fastify.get('/api/articles', {

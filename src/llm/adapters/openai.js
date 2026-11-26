@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { BaseLLMAdapter } from '../base-adapter.js';
 
 export class OpenAIAdapter extends BaseLLMAdapter {
@@ -18,7 +17,7 @@ export class OpenAIAdapter extends BaseLLMAdapter {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/models`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/models`, {
         headers: {
           'Authorization': `Bearer ${this.apiKey}`
         }
@@ -62,84 +61,60 @@ export class OpenAIAdapter extends BaseLLMAdapter {
   }
 
   async chat(messages, options = {}) {
-    const requestBody = {
+    const wantJson = !!options.json_mode && this.config.json_mode && !this.jsonModeUnsupported;
+    const build = (withJsonMode) => ({
       model: this.model,
       messages: messages,
       temperature: options.temperature || this.options.temperature,
       max_tokens: options.max_tokens || this.options.max_tokens,
-      response_format: options.json_mode ? { type: 'json_object' } : undefined
+      response_format: withJsonMode ? { type: 'json_object' } : undefined
+    });
+
+    const send = (withJsonMode) => this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`
+      },
+      body: JSON.stringify(build(withJsonMode))
+    });
+
+    const errorText = async (response) => {
+      const text = await response.text();
+      try {
+        const parsed = JSON.parse(text);
+        return parsed.error?.message || parsed.message || text;
+      } catch {
+        return text.slice(0, 300);
+      }
     };
 
     try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify(requestBody)
-      });
+      let response = await send(wantJson);
+
+      // Some OpenAI-compatible servers reject response_format: retry once without it
+      // and remember, so later calls do not repeat the failed attempt.
+      if (!response.ok && wantJson && response.status === 400) {
+        const message = await errorText(response);
+        if (/response_format|json_object|json mode/i.test(message)) {
+          this.jsonModeUnsupported = true;
+          response = await send(false);
+        } else {
+          throw new Error(`OpenAI request failed (HTTP 400): ${message}`);
+        }
+      }
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`OpenAI request failed: ${error.error?.message || JSON.stringify(error)}`);
+        throw new Error(`OpenAI request failed (HTTP ${response.status}): ${await errorText(response)}`);
       }
 
       const data = await response.json();
-      return data.choices[0].message.content;
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error('OpenAI response had no message content');
+      return content;
     } catch (error) {
-      console.error('OpenAI completion error:', error);
+      console.error('OpenAI completion error:', error.message);
       throw error;
-    }
-  }
-
-  // Override for better JSON responses
-  async detectBias(articleText) {
-    const prompt = this.config.prompts.bias_detection.replace('{article}', articleText);
-    
-    try {
-      const response = await this.complete(prompt, {
-        temperature: 0.3,
-        max_tokens: 500,
-        json_mode: true
-      });
-      
-      return this.parseJSONResponse(response);
-    } catch (error) {
-      console.error(`Bias detection failed with ${this.name}:`, error.message);
-      return {
-        bias_score: 0,
-        confidence: 0,
-        reasoning: 'Analysis failed',
-        indicators: [],
-        error: error.message
-      };
-    }
-  }
-
-  async extractFacts(articleText) {
-    const prompt = this.config.prompts.fact_extraction.replace('{article}', articleText);
-    
-    try {
-      const response = await this.complete(prompt, {
-        temperature: 0.2,
-        max_tokens: 800,
-        json_mode: true
-      });
-      
-      return this.parseJSONResponse(response);
-    } catch (error) {
-      console.error(`Fact extraction failed with ${this.name}:`, error.message);
-      return {
-        facts: [],
-        entities: {
-          people: [],
-          organizations: [],
-          locations: [],
-          dates: []
-        },
-        error: error.message
-      };
     }
   }
 }

@@ -3,6 +3,7 @@ import { newsAPI } from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import LoadingSpinner from '../components/LoadingSpinner';
 import './Settings.css';
+import { formatDateTime } from '../utils/time.mjs';
 
 function Settings() {
   const [activeTab, setActiveTab] = useState('sources');
@@ -703,7 +704,7 @@ function Settings() {
                       <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                           <span className={`status-dot ${job.status === 'success' ? 'enabled' : job.status === 'error' ? 'unavailable' : 'disabled'}`} />
-                          <strong>Last run:</strong> {new Date(job.last_run).toLocaleString()}
+                          <strong>Last run:</strong> {formatDateTime(job.last_run)}
                           <span style={{ color: job.status === 'success' ? '#065f46' : job.status === 'error' ? '#991b1b' : '#6b7280' }}>
                             ({job.status})
                           </span>
@@ -721,7 +722,7 @@ function Settings() {
                     )}
                     {job.next_run && (
                       <div style={{ marginTop: '4px', color: '#4b5563' }}>
-                        <strong>Next run:</strong> {new Date(job.next_run).toLocaleString()}
+                        <strong>Next run:</strong> {formatDateTime(job.next_run)}
                       </div>
                     )}
                   </div>
@@ -798,7 +799,7 @@ function Settings() {
                       <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                           <span className={`status-dot ${job.status === 'success' ? 'enabled' : job.status === 'error' ? 'unavailable' : 'disabled'}`} />
-                          <strong>Last run:</strong> {new Date(job.last_run).toLocaleString()}
+                          <strong>Last run:</strong> {formatDateTime(job.last_run)}
                           <span style={{ color: job.status === 'success' ? '#065f46' : job.status === 'error' ? '#991b1b' : '#6b7280' }}>
                             ({job.status})
                           </span>
@@ -817,7 +818,7 @@ function Settings() {
                     )}
                     {job.next_run && (
                       <div style={{ marginTop: '4px', color: '#4b5563' }}>
-                        <strong>Next run:</strong> {new Date(job.next_run).toLocaleString()}
+                        <strong>Next run:</strong> {formatDateTime(job.next_run)}
                       </div>
                     )}
                   </div>
@@ -1386,7 +1387,7 @@ function Settings() {
 
                   {job.last_run && (
                     <div className="job-info">
-                      <small>Last run: {new Date(job.last_run).toLocaleString()}</small>
+                      <small>Last run: {formatDateTime(job.last_run)}</small>
                     </div>
                   )}
 

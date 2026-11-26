@@ -3,48 +3,137 @@ import { runIngestion } from '../ingestion/index.js';
 import runClustering from '../jobs/cluster.js';
 import { runBackup } from '../jobs/backup.js';
 import { runCleanup } from '../jobs/cleanup.js';
-import { ScheduledJobs, Settings } from '../db/settings-model.js';
+import { ScheduledJobs } from '../db/settings-model.js';
+import { getDb } from '../db/index.js';
 
-let ingestionJob = null;
-let clusteringJob = null;
-let backupJob = null;
-let cleanupJob = null;
+// cron tasks, by job name (in-process node-cron handles)
+const tasks = {};
+// jobs that are executing right now IN THIS PROCESS (the only truthful "running")
+const running = new Set();
 
-export async function initializeScheduler() {
-  console.log('📅 Initializing scheduler...');
-  
-  // Initialize scheduled jobs in database
-  await initializeJobs();
-  
-  // Schedule based on scheduled_jobs table, not settings
-  const ingestionJob = ScheduledJobs.get('ingestion');
-  if (ingestionJob && ingestionJob.enabled) {
-    await scheduleIngestion(ingestionJob.cron_expression);
+// ---------------------------------------------------------------- cron arithmetic
+
+function parseField(field, min, max) {
+  const values = new Set();
+  for (const part of field.split(',')) {
+    const [rangeStr, stepStr] = part.split('/');
+    const step = stepStr === undefined ? 1 : parseInt(stepStr, 10);
+    if (!Number.isInteger(step) || step < 1) return null;
+    let lo, hi;
+    if (rangeStr === '*') { lo = min; hi = max; }
+    else if (/^\d+$/.test(rangeStr)) { lo = parseInt(rangeStr, 10); hi = stepStr === undefined ? lo : max; }
+    else if (/^\d+-\d+$/.test(rangeStr)) { [lo, hi] = rangeStr.split('-').map(Number); }
+    else return null;
+    if (lo < min || hi > max || lo > hi) return null;
+    for (let v = lo; v <= hi; v += step) values.add(v);
   }
-  
-  const clusteringJob = ScheduledJobs.get('clustering');
-  if (clusteringJob && clusteringJob.enabled) {
-    await scheduleClustering(clusteringJob.cron_expression);
+  return values;
+}
+
+/**
+ * Next time (strictly after `from`) a 5-field cron expression fires, in the process's
+ * local time zone like node-cron. Returns null for an expression it cannot understand.
+ */
+export function nextCronRun(expression, from = new Date()) {
+  const parts = String(expression || '').trim().split(/\s+/);
+  if (parts.length !== 5) return null;
+  const minutes = parseField(parts[0], 0, 59);
+  const hours = parseField(parts[1], 0, 23);
+  const doms = parseField(parts[2], 1, 31);
+  const months = parseField(parts[3], 1, 12);
+  const dowRaw = parseField(parts[4].replace(/\b7\b/g, '0'), 0, 7);
+  if (!minutes || !hours || !doms || !months || !dowRaw) return null;
+  const dows = new Set([...dowRaw].map(d => d % 7));
+  const domRestricted = parts[2] !== '*' && !parts[2].startsWith('*/');
+  const dowRestricted = parts[4] !== '*' && !parts[4].startsWith('*/');
+
+  const t = new Date(from.getTime());
+  t.setSeconds(0, 0);
+  t.setMinutes(t.getMinutes() + 1);
+  const limit = from.getTime() + 366 * 24 * 3600 * 1000;
+  while (t.getTime() <= limit) {
+    if (!months.has(t.getMonth() + 1)) { t.setMonth(t.getMonth() + 1, 1); t.setHours(0, 0, 0, 0); continue; }
+    const domOk = doms.has(t.getDate());
+    const dowOk = dows.has(t.getDay());
+    const dayOk = domRestricted && dowRestricted ? (domOk || dowOk) : (domOk && dowOk);
+    if (!dayOk) { t.setDate(t.getDate() + 1); t.setHours(0, 0, 0, 0); continue; }
+    if (!hours.has(t.getHours())) { t.setHours(t.getHours() + 1, 0, 0, 0); continue; }
+    if (!minutes.has(t.getMinutes())) { t.setMinutes(t.getMinutes() + 1); continue; }
+    return t;
   }
-  
-  const backupJobConfig = ScheduledJobs.get('backup');
-  if (backupJobConfig && backupJobConfig.enabled) {
-    await scheduleBackup(backupJobConfig.cron_expression);
+  return null;
+}
+
+function nextRunIso(expression) {
+  return nextCronRun(expression)?.toISOString() ?? null;
+}
+
+// ---------------------------------------------------------------- job status
+
+/**
+ * Run a job's task and record what really happened: running -> success|error, with
+ * next_run recomputed from the cron expression either way. A job that is still running
+ * is not started a second time.
+ */
+export async function runJob(name, task, summarize = () => null) {
+  if (running.has(name)) {
+    console.log(`⏭️  ${name} is still running, skipping this tick`);
+    return { skipped: true };
   }
-  
-  const cleanupJobConfig = ScheduledJobs.get('cleanup');
-  if (cleanupJobConfig && cleanupJobConfig.enabled) {
-    await scheduleCleanup(cleanupJobConfig.cron_expression);
+  running.add(name);
+  ScheduledJobs.update(name, { status: 'running', last_run: new Date().toISOString() });
+  try {
+    const result = await task();
+    ScheduledJobs.update(name, {
+      status: 'success',
+      next_run: nextRunIso(ScheduledJobs.get(name)?.cron_expression),
+      config: summarize(result) ? JSON.stringify(summarize(result)) : null
+    });
+    return { result };
+  } catch (error) {
+    console.error(`❌ ${name} failed:`, error);
+    ScheduledJobs.update(name, {
+      status: 'error',
+      next_run: nextRunIso(ScheduledJobs.get(name)?.cron_expression),
+      config: JSON.stringify({ error: error.message })
+    });
+    return { error };
+  } finally {
+    running.delete(name);
   }
 }
 
+/**
+ * Called on boot: whatever a previous process left as "running" cannot still be running.
+ */
+export function recoverStaleJobs() {
+  for (const row of ScheduledJobs.getAll()) {
+    if (row.status === 'running' && !running.has(row.job_name)) {
+      ScheduledJobs.update(row.job_name, {
+        status: 'interrupted',
+        next_run: row.enabled ? nextRunIso(row.cron_expression) : null
+      });
+    }
+  }
+}
+
+/** Job rows as the API reports them: status and next_run that match reality. */
+export function getJobsStatus() {
+  return ScheduledJobs.getAll().map(row => ({
+    ...row,
+    status: row.status === 'running' && !running.has(row.job_name) ? 'interrupted' : row.status,
+    is_running: running.has(row.job_name),
+    next_run: row.enabled ? nextRunIso(row.cron_expression) : null
+  }));
+}
+
+// ---------------------------------------------------------------- scheduling
+
 async function initializeJobs() {
   const db = getDb();
-  
-  // Create default jobs if they don't exist
   db.prepare(`
     INSERT OR IGNORE INTO scheduled_jobs (job_name, enabled, cron_expression, status)
-    VALUES 
+    VALUES
       ('ingestion', 1, '*/15 * * * *', 'idle'),
       ('clustering', 1, '*/30 * * * *', 'idle'),
       ('cleanup', 0, '0 3 * * *', 'idle'),
@@ -52,227 +141,69 @@ async function initializeJobs() {
   `).run();
 }
 
+export async function initializeScheduler() {
+  console.log('📅 Initializing scheduler...');
+  await initializeJobs();
+  recoverStaleJobs();
+
+  const starters = {
+    ingestion: scheduleIngestion,
+    clustering: scheduleClustering,
+    backup: scheduleBackup,
+    cleanup: scheduleCleanup
+  };
+  for (const [name, start] of Object.entries(starters)) {
+    const job = ScheduledJobs.get(name);
+    if (job && job.enabled) await start(job.cron_expression);
+  }
+}
+
+function schedule(name, label, cronExpression, taskFn, summarize) {
+  if (tasks[name]) {
+    tasks[name].stop();
+    tasks[name] = null;
+    console.log(`⏹️  Stopped ${name} job`);
+  }
+  if (!cronExpression || !cron.validate(cronExpression)) return;
+
+  tasks[name] = cron.schedule(cronExpression, async () => {
+    console.log(`${label} Running scheduled ${name}...`);
+    await runJob(name, taskFn, summarize);
+  });
+  tasks[name].start();
+  console.log(`📅 Scheduled ${name}: ${cronExpression}`);
+
+  ScheduledJobs.update(name, {
+    enabled: 1,
+    cron_expression: cronExpression,
+    next_run: nextRunIso(cronExpression)
+  });
+}
+
 export async function scheduleIngestion(cronExpression = null) {
-  // Stop existing job
-  if (ingestionJob) {
-    ingestionJob.stop();
-    ingestionJob = null;
-    console.log('⏹️  Stopped ingestion job');
-  }
-  
-  // Start new job if expression provided
-  if (cronExpression && cron.validate(cronExpression)) {
-    ingestionJob = cron.schedule(cronExpression, async () => {
-      console.log('🔄 Running scheduled ingestion...');
-      
-      try {
-        ScheduledJobs.update('ingestion', { 
-          status: 'running',
-          last_run: new Date().toISOString()
-        });
-        
-        const results = await runIngestion();
-        
-        ScheduledJobs.update('ingestion', {
-          status: 'success',
-          next_run: getNextRun(cronExpression)
-        });
-        
-        console.log(`✅ Ingestion completed: ${results.totalArticles} articles from ${results.results.length} sources`);
-      } catch (error) {
-        console.error('❌ Ingestion failed:', error);
-        
-        ScheduledJobs.update('ingestion', {
-          status: 'error',
-          config: JSON.stringify({ error: error.message })
-        });
-      }
-    });
-    
-    ingestionJob.start(); // Actually start the cron job!
-    console.log(`📅 Scheduled ingestion: ${cronExpression}`);
-    
-    ScheduledJobs.update('ingestion', {
-      enabled: 1,
-      cron_expression: cronExpression,
-      next_run: getNextRun(cronExpression)
-    });
-  }
+  schedule('ingestion', '🔄', cronExpression, runIngestion, null);
 }
 
 export async function scheduleClustering(cronExpression = null) {
-  // Stop existing job
-  if (clusteringJob) {
-    clusteringJob.stop();
-    clusteringJob = null;
-    console.log('⏹️  Stopped clustering job');
-  }
-  
-  // Start new job if expression provided
-  if (cronExpression && cron.validate(cronExpression)) {
-    clusteringJob = cron.schedule(cronExpression, async () => {
-      console.log('🔗 Running scheduled clustering...');
-      
-      try {
-        ScheduledJobs.update('clustering', {
-          status: 'running',
-          last_run: new Date().toISOString()
-        });
-        
-        const result = await runClustering();
-        
-        ScheduledJobs.update('clustering', {
-          status: 'success',
-          next_run: getNextRun(cronExpression),
-          config: JSON.stringify({
-            clusters_created: result.clusters_created,
-            articles_processed: result.articles_processed
-          })
-        });
-
-        console.log(`✅ Clustering completed: ${result.clusters_created} clusters from ${result.articles_processed} articles`);
-      } catch (error) {
-        console.error('❌ Clustering failed:', error);
-        
-        ScheduledJobs.update('clustering', {
-          status: 'error',
-          config: JSON.stringify({ error: error.message })
-        });
-      }
-    });
-    
-    clusteringJob.start(); // Actually start the cron job!
-    console.log(`📅 Scheduled clustering: ${cronExpression}`);
-    
-    ScheduledJobs.update('clustering', {
-      enabled: 1,
-      cron_expression: cronExpression,
-      next_run: getNextRun(cronExpression)
-    });
-  }
-}
-
-// Helper to calculate next run time (simplified - just estimate based on expression)
-function getNextRun(cronExpression) {
-  // For now, just return a simple estimate
-  // TODO: Use a proper cron parser library if needed
-  const now = new Date();
-  if (cronExpression.includes('*/1 * * * *')) {
-    now.setMinutes(now.getMinutes() + 1);
-  } else if (cronExpression.includes('*/15 * * * *')) {
-    now.setMinutes(now.getMinutes() + 15);
-  } else if (cronExpression.includes('*/30 * * * *')) {
-    now.setMinutes(now.getMinutes() + 30);
-  } else {
-    now.setHours(now.getHours() + 1);
-  }
-  return now.toISOString();
+  schedule('clustering', '🔗', cronExpression, runClustering, r => ({
+    clusters_created: r.clusters_created,
+    articles_processed: r.articles_processed
+  }));
 }
 
 export async function scheduleBackup(cronExpression = null) {
-  // Stop existing job
-  if (backupJob) {
-    backupJob.stop();
-    backupJob = null;
-    console.log('⏹️  Stopped backup job');
-  }
-  
-  // Start new job if expression provided
-  if (cronExpression && cron.validate(cronExpression)) {
-    backupJob = cron.schedule(cronExpression, async () => {
-      console.log('💾 Running scheduled backup...');
-      
-      try {
-        ScheduledJobs.update('backup', {
-          status: 'running',
-          last_run: new Date().toISOString()
-        });
-        
-        const result = await runBackup();
-        
-        ScheduledJobs.update('backup', {
-          status: 'success',
-          next_run: getNextRun(cronExpression),
-          config: JSON.stringify({
-            location: result.location,
-            articles: result.articles,
-            sources: result.sources
-          })
-        });
-        
-        console.log(`✅ Backup completed: ${result.location}`);
-      } catch (error) {
-        console.error('❌ Backup failed:', error);
-        
-        ScheduledJobs.update('backup', {
-          status: 'error',
-          config: JSON.stringify({ error: error.message })
-        });
-      }
-    });
-    
-    backupJob.start();
-    console.log(`📅 Scheduled backup: ${cronExpression}`);
-    
-    ScheduledJobs.update('backup', {
-      enabled: 1,
-      cron_expression: cronExpression,
-      next_run: getNextRun(cronExpression)
-    });
-  }
+  schedule('backup', '💾', cronExpression, runBackup, r => ({
+    location: r.location, articles: r.articles, sources: r.sources
+  }));
 }
 
 export async function scheduleCleanup(cronExpression = null) {
-  // Stop existing job
-  if (cleanupJob) {
-    cleanupJob.stop();
-    cleanupJob = null;
-    console.log('⏹️  Stopped cleanup job');
-  }
-  
-  // Start new job if expression provided
-  if (cronExpression && cron.validate(cronExpression)) {
-    cleanupJob = cron.schedule(cronExpression, async () => {
-      console.log('🗑️  Running scheduled cleanup...');
-      
-      try {
-        ScheduledJobs.update('cleanup', {
-          status: 'running',
-          last_run: new Date().toISOString()
-        });
-        
-        const result = await runCleanup();
-        
-        ScheduledJobs.update('cleanup', {
-          status: 'success',
-          next_run: getNextRun(cronExpression),
-          config: JSON.stringify({
-            articles_deleted: result.articlesDeleted,
-            entities_deleted: result.entitiesDeleted,
-            retention_days: result.retentionDays
-          })
-        });
-        
-        console.log(`✅ Cleanup completed: ${result.articlesDeleted} articles deleted`);
-      } catch (error) {
-        console.error('❌ Cleanup failed:', error);
-        
-        ScheduledJobs.update('cleanup', {
-          status: 'error',
-          config: JSON.stringify({ error: error.message })
-        });
-      }
-    });
-    
-    cleanupJob.start();
-    console.log(`📅 Scheduled cleanup: ${cronExpression}`);
-    
-    ScheduledJobs.update('cleanup', {
-      enabled: 1,
-      cron_expression: cronExpression,
-      next_run: getNextRun(cronExpression)
-    });
-  }
+  schedule('cleanup', '🗑️ ', cronExpression, runCleanup, r => ({
+    articles_deleted: r.articlesDeleted,
+    entities_deleted: r.entitiesDeleted,
+    retention_days: r.retentionDays,
+    skipped: r.skipped || undefined
+  }));
 }
 
 // Manual trigger functions
@@ -298,25 +229,9 @@ export async function triggerCleanup() {
 
 // Get scheduler status
 export function getSchedulerStatus() {
-  return {
-    ingestion: {
-      running: ingestionJob !== null,
-      ...ScheduledJobs.get('ingestion')
-    },
-    clustering: {
-      running: clusteringJob !== null,
-      ...ScheduledJobs.get('clustering')
-    },
-    backup: {
-      running: backupJob !== null,
-      ...ScheduledJobs.get('backup')
-    },
-    cleanup: {
-      running: cleanupJob !== null,
-      ...ScheduledJobs.get('cleanup')
-    }
-  };
+  const status = {};
+  for (const job of getJobsStatus()) {
+    status[job.job_name] = { running: !!tasks[job.job_name], ...job };
+  }
+  return status;
 }
-
-// Import getDb
-import { getDb } from '../db/index.js';

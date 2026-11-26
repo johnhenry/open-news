@@ -29,7 +29,7 @@ export class GeminiAdapter extends BaseLLMAdapter {
 
     try {
       // Test the API with a minimal request
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}/models/${this.model}:generateContent`,
         {
           method: 'POST',
@@ -90,7 +90,7 @@ export class GeminiAdapter extends BaseLLMAdapter {
     };
 
     try {
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}/models/${this.model}:generateContent`,
         {
           method: 'POST',
@@ -168,7 +168,7 @@ export class GeminiAdapter extends BaseLLMAdapter {
     };
 
     try {
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}/models/${this.model}:generateContent`,
         {
           method: 'POST',

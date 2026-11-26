@@ -142,14 +142,19 @@ class ArticleAnalyzer {
     try {
       const biasResult = await this.llmManager.detectBias(article.content);
 
-      if (!biasResult || biasResult._failed) {
-        return { _failed: true, reason: biasResult?.reasoning || 'LLM returned no result' };
+      if (!biasResult || biasResult._failed || biasResult.error) {
+        return {
+          _failed: true,
+          reason: biasResult?.reasoning || biasResult?.error || 'LLM returned no result',
+          queue_full: !!biasResult?._queue_full
+        };
       }
 
-      if (biasResult.bias_score !== undefined) {
+      const score = Number(biasResult.bias_score);
+      if (biasResult.bias_score !== null && biasResult.bias_score !== undefined && Number.isFinite(score)) {
         return {
-          bias: getBiasLabel(biasResult.bias_score),
-          bias_score: biasResult.bias_score,
+          bias: getBiasLabel(score),
+          bias_score: score,
           sentiment_score: biasResult.sentiment_score || 0,
           analysis_method: 'llm',
           llm_confidence: biasResult.confidence || null,

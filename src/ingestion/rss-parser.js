@@ -4,6 +4,8 @@ import { extractContent } from './content-extractor.js';
 import { getArticleAnalyzer } from '../services/article-analyzer.js';
 import { getFactExtractor } from '../llm/fact-extractor.js';
 import { Settings } from '../db/settings-model.js';
+import { fetchFeedXml } from './feed-url.js';
+import { normalizePublishedAt } from './dates.js';
 
 const parser = new Parser({
   customFields: {
@@ -17,7 +19,7 @@ const parser = new Parser({
 
 // Rate limit: max articles to LLM-analyze per ingestion cycle (-1 = unlimited)
 function getLLMAnalysisRateLimit() {
-  const val = parseInt(Settings.get('llm_analysis_rate_limit') || process.env.getLLMAnalysisRateLimit() || '5');
+  const val = parseInt(Settings.get('llm_analysis_rate_limit') || process.env.LLM_ANALYSIS_RATE_LIMIT || '5');
   return val === -1 ? Infinity : val;
 }
 
@@ -30,7 +32,9 @@ export async function fetchRSSFeed(source) {
 
   try {
     console.log(`📡 Fetching RSS feed for ${source.name}: ${source.rss_url}`);
-    const feed = await parser.parseURL(source.rss_url);
+    const { xml } = await fetchFeedXml(source.rss_url);
+    const feed = await parser.parseString(xml);
+    const fetchedAt = new Date();
 
     // Get analyzer instance once for this feed
     const analyzer = await getArticleAnalyzer();
@@ -61,7 +65,7 @@ export async function fetchRSSFeed(source) {
           title: item.title,
           url: item.link,
           author: item.creator || item.author || null,
-          published_at: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+          ...normalizePublishedAt(item.pubDate || item.isoDate, fetchedAt),
           excerpt: item.contentSnippet || item.summary || null,
           content: content?.text || item.contentEncoded || null,
           image_url: extractImageUrl(item),
@@ -166,19 +170,24 @@ async function runAsyncLLMAnalysis(articles, analyzer, sourceDefaultBias) {
   console.log(`🤖 LLM analysis complete: ${analyzed} new, ${failed} failed, ${retried} retried successfully`);
 }
 
-async function analyzeSingleArticle(article, analyzer, factExtractor) {
+export async function analyzeSingleArticle(article, analyzer, factExtractor) {
   try {
     const analysis = await analyzer.llmAnalysis(article);
 
     if (!analysis || analysis._failed) {
-      const retryCount = (article.llm_retry_count || 0) + 1;
+      // Not analysed. The article keeps its source-default bias; it is flagged llm_failed (or
+      // llm_skipped after repeated failures), never stored as an LLM result of 0.
+      // A call rejected by queue back-pressure was never attempted: do not count it.
+      const queueFull = !!analysis?.queue_full;
+      const retryCount = (article.llm_retry_count || 0) + (queueFull ? 0 : 1);
       const maxRetries = 3;
       Article.update(article.id, {
         analysis_method: retryCount >= maxRetries ? 'llm_skipped' : 'llm_failed',
         llm_retry_count: retryCount,
+        llm_confidence: null,
         llm_reasoning: analysis?.reason || 'Analysis failed',
       });
-      console.log(`  ❌ LLM failed for "${article.title?.substring(0, 50)}..." (retry ${retryCount}/${maxRetries})`);
+      console.log(`  ❌ LLM failed for "${article.title?.substring(0, 50)}..." (${queueFull ? 'queue full, will retry' : `retry ${retryCount}/${maxRetries}`})`);
       return false;
     }
 
@@ -214,6 +223,7 @@ async function analyzeSingleArticle(article, analyzer, factExtractor) {
     Article.update(article.id, {
       analysis_method: retryCount >= 3 ? 'llm_skipped' : 'llm_failed',
       llm_retry_count: retryCount,
+      llm_confidence: null,
       llm_reasoning: err.message,
     });
     console.error(`  ❌ LLM error for article ${article.id}:`, err.message);

@@ -6,24 +6,13 @@ import BiasSpectrum from '../components/BiasSpectrum';
 import ClusterCard from '../components/ClusterCard';
 import SearchBar from '../components/SearchBar';
 import BlindspotSection from '../components/BlindspotSection';
+import { parseApiDate, timeAgo, formatDateTime } from '../utils/time.mjs';
 
 const SORT_OPTIONS = [
   { key: 'most_recent', label: 'Most Recent' },
   { key: 'most_covered', label: 'Most Covered' },
   { key: 'most_one_sided', label: 'Most One-Sided' },
 ];
-
-function timeAgo(dateStr) {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 function sortClusters(clusters, sortBy) {
   const sorted = [...clusters];
@@ -36,8 +25,8 @@ function sortClusters(clusters, sortBy) {
       });
     case 'most_recent':
       return sorted.sort((a, b) => {
-        const aDate = new Date(a.updated_at || a.created_at || 0);
-        const bDate = new Date(b.updated_at || b.created_at || 0);
+        const aDate = (parseApiDate(a.updated_at || a.created_at) || new Date(0));
+        const bDate = (parseApiDate(b.updated_at || b.created_at) || new Date(0));
         return bDate - aDate;
       });
     case 'most_one_sided': {
@@ -247,13 +236,14 @@ function Dashboard() {
                 {ingestionJob.status === 'success' && ' - Success'}
                 {ingestionJob.status === 'error' && ' - Failed'}
                 {ingestionJob.status === 'running' && ' - Running...'}
+                {ingestionJob.status === 'interrupted' && ' - Interrupted (restarted)'}
               </div>
             ) : (
               <div className="dashboard__status-value dashboard__status-value--empty">No runs yet</div>
             )}
             {ingestionJob?.next_run && (
               <div className="dashboard__status-next">
-                Next: {new Date(ingestionJob.next_run).toLocaleString()}
+                Next: {formatDateTime(ingestionJob.next_run)}
               </div>
             )}
           </div>
@@ -269,13 +259,15 @@ function Dashboard() {
                   <span> - {clusteringConfig.clusters_created} new clusters</span>
                 )}
                 {clusteringJob.status === 'error' && ' - Failed'}
+                {clusteringJob.status === 'running' && ' - Running...'}
+                {clusteringJob.status === 'interrupted' && ' - Interrupted (restarted)'}
               </div>
             ) : (
               <div className="dashboard__status-value dashboard__status-value--empty">No runs yet</div>
             )}
             {clusteringJob?.next_run && (
               <div className="dashboard__status-next">
-                Next: {new Date(clusteringJob.next_run).toLocaleString()}
+                Next: {formatDateTime(clusteringJob.next_run)}
               </div>
             )}
           </div>

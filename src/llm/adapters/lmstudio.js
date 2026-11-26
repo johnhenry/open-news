@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { BaseLLMAdapter } from '../base-adapter.js';
 
 export class LMStudioAdapter extends BaseLLMAdapter {
@@ -12,7 +11,7 @@ export class LMStudioAdapter extends BaseLLMAdapter {
 
   async initialize() {
     try {
-      const response = await fetch(`${this.baseUrl}/models`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/models`, {
         headers: {
           'Authorization': `Bearer ${this.apiKey}`
         }
@@ -53,7 +52,7 @@ export class LMStudioAdapter extends BaseLLMAdapter {
     };
 
     try {
-      const response = await fetch(`${this.baseUrl}/completions`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -85,7 +84,7 @@ export class LMStudioAdapter extends BaseLLMAdapter {
     };
 
     try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

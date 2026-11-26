@@ -1,5 +1,10 @@
 import { Settings } from '../db/settings-model.js';
 
+function intEnv(name, dflt) {
+  const v = parseInt(process.env[name] || '', 10);
+  return Number.isFinite(v) ? v : dflt;
+}
+
 export const LLM_CONFIG = {
   // Default adapter to use - DB takes priority over env var
   get default_adapter() {
@@ -10,54 +15,57 @@ export const LLM_CONFIG = {
     }
   },
   
-  // Adapter-specific configurations
-  adapters: {
-    ollama: {
-      base_url: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-      model: process.env.OLLAMA_MODEL || 'llama3.2:latest',
-      options: {
-        temperature: 0.7,
-        max_tokens: 1000
+  // Per-call timeout, concurrency and queue limits (read on every use, so env changes apply)
+  get timeout_ms() { return intEnv('LLM_TIMEOUT_MS', 120000); },
+  get max_concurrency() { return Math.max(1, intEnv('LLM_MAX_CONCURRENCY', 1)); },
+  get queue_max() { return Math.max(0, intEnv('LLM_QUEUE_MAX', 50)); },
+  // Ask for JSON/structured output where the endpoint supports it (LLM_JSON_MODE=false to disable)
+  get json_mode() { return (process.env.LLM_JSON_MODE || 'true').toLowerCase() !== 'false'; },
+
+  // Adapter-specific configurations.
+  // Generic overrides: when LLM_BASE_URL / LLM_MODEL / LLM_API_KEY are set they replace the
+  // base URL, model and key of the OpenAI-compatible and Ollama-compatible adapters
+  // (ollama, openai, lmstudio). Unset, the per-provider variables below apply exactly as before.
+  get adapters() {
+    const e = process.env;
+    const o = { base: e.LLM_BASE_URL, model: e.LLM_MODEL, key: e.LLM_API_KEY };
+    return {
+      ollama: {
+        base_url: o.base || e.OLLAMA_BASE_URL || 'http://localhost:11434',
+        model: o.model || e.OLLAMA_MODEL || 'llama3.2:latest',
+        api_key: o.key || e.OLLAMA_API_KEY || e.OPENAI_API_KEY || '',
+        options: { temperature: 0.7, max_tokens: 1000 }
+      },
+
+      lmstudio: {
+        base_url: o.base || e.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1',
+        model: o.model || e.LMSTUDIO_MODEL || 'local-model',
+        api_key: o.key || e.LMSTUDIO_API_KEY || 'lm-studio'
+      },
+
+      openai: {
+        base_url: o.base || e.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+        api_key: o.key || e.OPENAI_API_KEY,
+        model: o.model || e.OPENAI_MODEL || 'gpt-4o-mini',
+        options: { temperature: 0.7, max_tokens: 1000 }
+      },
+
+      anthropic: {
+        base_url: e.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1',
+        api_key: e.ANTHROPIC_API_KEY,
+        model: e.ANTHROPIC_MODEL || 'claude-3-haiku-20240307',
+        options: { max_tokens: 1000, temperature: 0.7 }
+      },
+
+      gemini: {
+        base_url: e.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
+        api_key: e.GEMINI_API_KEY,
+        model: e.GEMINI_MODEL || 'gemini-1.5-flash',
+        options: { temperature: 0.7, maxOutputTokens: 1000 }
       }
-    },
-    
-    lmstudio: {
-      base_url: process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1',
-      model: process.env.LMSTUDIO_MODEL || 'local-model',
-      api_key: process.env.LMSTUDIO_API_KEY || 'lm-studio'
-    },
-    
-    openai: {
-      base_url: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
-      api_key: process.env.OPENAI_API_KEY,
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      options: {
-        temperature: 0.7,
-        max_tokens: 1000
-      }
-    },
-    
-    anthropic: {
-      base_url: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1',
-      api_key: process.env.ANTHROPIC_API_KEY,
-      model: process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307',
-      options: {
-        max_tokens: 1000,
-        temperature: 0.7
-      }
-    },
-    
-    gemini: {
-      base_url: process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
-      api_key: process.env.GEMINI_API_KEY,
-      model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
-      options: {
-        temperature: 0.7,
-        maxOutputTokens: 1000
-      }
-    }
+    };
   },
-  
+
   // Prompts for different tasks - reads from Settings DB with hardcoded fallbacks
   prompts: {
     get bias_detection() {

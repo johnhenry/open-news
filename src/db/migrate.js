@@ -58,6 +58,8 @@ function migrate() {
       { name: 'llm_reasoning', sql: 'ALTER TABLE articles ADD COLUMN llm_reasoning TEXT' },
       { name: 'llm_indicators', sql: 'ALTER TABLE articles ADD COLUMN llm_indicators TEXT' },
       { name: 'llm_facts', sql: 'ALTER TABLE articles ADD COLUMN llm_facts TEXT' },
+      // additive and nullable: raw feed date when we had to replace an implausible one
+      { name: 'published_at_raw', sql: 'ALTER TABLE articles ADD COLUMN published_at_raw TEXT' },
     ];
 
     for (const col of llmColumns) {

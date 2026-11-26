@@ -4,6 +4,13 @@ import { LMStudioAdapter } from './adapters/lmstudio.js';
 import { OpenAIAdapter } from './adapters/openai.js';
 import { AnthropicAdapter } from './adapters/anthropic.js';
 import { GeminiAdapter } from './adapters/gemini.js';
+import { runLimited } from './limiter.js';
+
+// A rejected-by-back-pressure call is reported as a failure that is marked queue_full, so
+// callers can leave the article retryable instead of counting it as an attempt.
+function queueFailure(error, failure) {
+  return error?.queueFull ? { ...failure, _queue_full: true } : { ...failure, reasoning: failure.reasoning ?? error.message };
+}
 
 class LLMManager {
   constructor() {
@@ -109,7 +116,11 @@ class LLMManager {
       return null;
     }
 
-    return this.currentAdapter.detectBias(articleText);
+    try {
+      return await runLimited(() => this.currentAdapter.detectBias(articleText));
+    } catch (error) {
+      return queueFailure(error, { bias_score: null, confidence: null, reasoning: `LLM call not made: ${error.message}`, indicators: [], _failed: true });
+    }
   }
 
   async extractFacts(articleText) {
@@ -118,7 +129,11 @@ class LLMManager {
       return null;
     }
 
-    return this.currentAdapter.extractFacts(articleText);
+    try {
+      return await runLimited(() => this.currentAdapter.extractFacts(articleText));
+    } catch (error) {
+      return queueFailure(error, { facts: [], entities: { people: [], organizations: [], locations: [], dates: [] }, error: error.message, _failed: true });
+    }
   }
 
   async findConsensus(articles) {
@@ -127,7 +142,11 @@ class LLMManager {
       return null;
     }
 
-    return this.currentAdapter.findConsensus(articles);
+    try {
+      return await runLimited(() => this.currentAdapter.findConsensus(articles));
+    } catch (error) {
+      return queueFailure(error, { consensus_facts: [], disputed_points: [], unique_angles: { left: [], center: [], right: [] }, error: error.message, _failed: true });
+    }
   }
 
   async summarizeCluster(articles) {
@@ -136,7 +155,12 @@ class LLMManager {
       return null;
     }
 
-    return this.currentAdapter.summarizeCluster(articles);
+    try {
+      return await runLimited(() => this.currentAdapter.summarizeCluster(articles));
+    } catch (error) {
+      console.error('Cluster summarization not run:', error.message);
+      return null;
+    }
   }
 
   async testAllAdapters() {

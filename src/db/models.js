@@ -4,6 +4,19 @@ import db from './database.js';
 const ALLOWED_SOURCE_FIELDS = ['name', 'url', 'rss_url', 'api_url', 'bias', 'bias_score', 'scraping_enabled', 'active', 'notes'];
 const ALLOWED_ARTICLE_FIELDS = ['title', 'excerpt', 'content', 'image_url', 'bias', 'bias_score', 'sentiment_score', 'analysis_method', 'llm_confidence', 'llm_reasoning', 'llm_indicators', 'llm_facts', 'llm_retry_count'];
 
+// A published_at more than a day in the future is bad feed data. Reads show created_at
+// instead (the stored value is never rewritten) and sort by that effective date.
+const FUTURE_BOUND = "strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day')";
+const EFFECTIVE_PUBLISHED = `(CASE WHEN a.published_at > ${FUTURE_BOUND} THEN strftime('%Y-%m-%dT%H:%M:%fZ', a.created_at) ELSE a.published_at END)`;
+const ARTICLE_COLS = `a.*, ${EFFECTIVE_PUBLISHED} AS published_at`;
+
+// Ordering by the expression cannot use the published_at index, so only do it while a
+// future-dated row actually exists (a cheap index range probe).
+function orderByPublished() {
+  const future = db.prepare(`SELECT 1 FROM articles a WHERE a.published_at > ${FUTURE_BOUND} LIMIT 1`).get();
+  return future ? `${EFFECTIVE_PUBLISHED} DESC` : 'a.published_at DESC';
+}
+
 /**
  * Filter object to only include allowed fields
  */
@@ -64,17 +77,17 @@ export const Article = {
 
   getAll(limit = 100, offset = 0) {
     return db.prepare(`
-      SELECT a.*, s.name as source_name, s.bias as source_bias
+      SELECT ${ARTICLE_COLS}, s.name as source_name, s.bias as source_bias
       FROM articles a
       JOIN sources s ON a.source_id = s.id
-      ORDER BY a.published_at DESC
+      ORDER BY ${orderByPublished()}
       LIMIT ? OFFSET ?
     `).all(limit, offset);
   },
 
   getById(id) {
     return db.prepare(`
-      SELECT a.*, s.name as source_name, s.bias as source_bias
+      SELECT ${ARTICLE_COLS}, s.name as source_name, s.bias as source_bias
       FROM articles a
       JOIN sources s ON a.source_id = s.id
       WHERE a.id = ?
@@ -89,6 +102,8 @@ export const Article = {
       WHERE a.analysis_method = 'llm_failed'
         AND (a.llm_retry_count IS NULL OR a.llm_retry_count < ?)
         AND a.content IS NOT NULL AND length(a.content) > 0
+        AND a.created_at >= datetime('now', '-3 days')
+        AND a.updated_at <= datetime('now', '-30 minutes')
       ORDER BY a.llm_retry_count ASC, a.published_at DESC
       LIMIT ?
     `).all(maxRetries, limit);
@@ -96,11 +111,11 @@ export const Article = {
 
   getUnclustered(limit = 200) {
     return db.prepare(`
-      SELECT a.*, s.name as source_name, s.bias as source_bias
+      SELECT ${ARTICLE_COLS}, s.name as source_name, s.bias as source_bias
       FROM articles a
       JOIN sources s ON a.source_id = s.id
       WHERE a.id NOT IN (SELECT article_id FROM article_clusters)
-      ORDER BY a.published_at DESC
+      ORDER BY ${orderByPublished()}
       LIMIT ?
     `).all(limit);
   },
@@ -111,7 +126,7 @@ export const Article = {
 
   getByCluster(clusterId) {
     return db.prepare(`
-      SELECT a.*, s.name as source_name, s.bias as source_bias, ac.similarity_score
+      SELECT ${ARTICLE_COLS}, s.name as source_name, s.bias as source_bias, ac.similarity_score
       FROM articles a
       JOIN sources s ON a.source_id = s.id
       JOIN article_clusters ac ON a.id = ac.article_id
@@ -123,14 +138,14 @@ export const Article = {
   create(article) {
     const stmt = db.prepare(`
       INSERT INTO articles (
-        source_id, title, url, author, published_at, excerpt, content,
+        source_id, title, url, author, published_at, published_at_raw, excerpt, content,
         image_url, bias, bias_score, sentiment_score, analysis_method
       ) VALUES (
-        @source_id, @title, @url, @author, @published_at, @excerpt, @content,
+        @source_id, @title, @url, @author, @published_at, @published_at_raw, @excerpt, @content,
         @image_url, @bias, @bias_score, @sentiment_score, @analysis_method
       )
     `);
-    return stmt.run({ analysis_method: 'source_default', ...article });
+    return stmt.run({ analysis_method: 'source_default', published_at_raw: null, ...article });
   },
 
   update(id, updates) {
@@ -208,11 +223,11 @@ export const Article = {
 
     // Get results
     const query = `
-      SELECT a.*, s.name as source_name, s.bias as source_bias
+      SELECT ${ARTICLE_COLS}, s.name as source_name, s.bias as source_bias
       FROM articles a
       JOIN sources s ON a.source_id = s.id
       ${whereClause}
-      ORDER BY a.published_at DESC
+      ORDER BY ${orderByPublished()}
       LIMIT ? OFFSET ?
     `;
     params.push(limit, offset);
@@ -478,13 +493,13 @@ export const Entity = {
     `).get(...params).total;
 
     const articles = db.prepare(`
-      SELECT DISTINCT a.*, s.name as source_name, s.bias as source_bias,
+      SELECT DISTINCT ${ARTICLE_COLS}, s.name as source_name, s.bias as source_bias,
         e.entity_value as matched_entity, e.entity_type as matched_entity_type
       FROM entities e
       JOIN articles a ON e.article_id = a.id
       JOIN sources s ON a.source_id = s.id
       ${whereClause}
-      ORDER BY a.published_at DESC
+      ORDER BY ${orderByPublished()}
       LIMIT ? OFFSET ?
     `).all(...params, limit, offset);
 
